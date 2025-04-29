@@ -3,13 +3,14 @@ import React, { useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { useProcessing } from '../contexts/ProcessingContext';
-import { Loader2, Upload, AlertCircle } from 'lucide-react';
+import { Loader2, Upload, AlertCircle, FileQuestion } from 'lucide-react';
 import { toast } from './ui/use-toast';
 
 const FileUploader: React.FC = () => {
   const { handleFileUpload, isUploading } = useProcessing();
   const [dragActive, setDragActive] = useState(false);
   const [dragError, setDragError] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const validateFileType = (file: File): boolean => {
@@ -37,8 +38,13 @@ const FileUploader: React.FC = () => {
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
+      setFileName(file.name);
       
       if (validateFileType(file)) {
+        toast({
+          title: "File Accepted",
+          description: `Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
+        });
         handleFileUpload(file);
       } else {
         setDragError(true);
@@ -55,8 +61,13 @@ const FileUploader: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+      setFileName(file.name);
       
       if (validateFileType(file)) {
+        toast({
+          title: "File Accepted",
+          description: `Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
+        });
         handleFileUpload(file);
       } else {
         toast({
@@ -102,9 +113,11 @@ const FileUploader: React.FC = () => {
           />
           
           <div className="flex flex-col items-center justify-center space-y-4">
-            <div className={`p-3 rounded-full ${dragError ? 'bg-destructive/10' : 'bg-muted'}`}>
+            <div className={`p-3 rounded-full ${dragError ? 'bg-destructive/10' : isUploading && fileName ? 'bg-amber-100' : 'bg-muted'}`}>
               {dragError ? (
                 <AlertCircle className="h-8 w-8 text-destructive" />
+              ) : isUploading && fileName ? (
+                <FileQuestion className="h-8 w-8 text-amber-600" />
               ) : (
                 <Upload className="h-8 w-8 text-primary" />
               )}
@@ -113,7 +126,8 @@ const FileUploader: React.FC = () => {
             {isUploading ? (
               <div className="flex flex-col items-center space-y-2">
                 <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                <p className="text-muted-foreground text-sm">Uploading...</p>
+                <p className="text-muted-foreground text-sm">Analyzing {fileName}...</p>
+                <p className="text-xs text-muted-foreground">This may take a moment for large files</p>
               </div>
             ) : dragError ? (
               <>
@@ -130,8 +144,17 @@ const FileUploader: React.FC = () => {
                   Upload an Excel or CSV file containing your survey responses
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  File should include a column with open-ended responses
+                  For best results, make sure your file contains a column with text responses
                 </p>
+                <div className="mt-2 text-xs text-muted-foreground p-2 bg-gray-50 rounded border border-gray-100">
+                  <p className="font-semibold mb-1">Tips for successful uploads:</p>
+                  <ul className="list-disc list-inside space-y-1 text-left">
+                    <li>Use column headers like "Response", "Comments", or "Feedback"</li>
+                    <li>Make sure text responses are in a single column</li>
+                    <li>Remove empty rows at the beginning of your file</li>
+                    <li>For Excel: Save as .xlsx format</li>
+                  </ul>
+                </div>
               </>
             )}
           </div>

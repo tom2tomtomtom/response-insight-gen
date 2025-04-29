@@ -43,58 +43,163 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [rawResponses, setRawResponses] = useState<string[]>([]);
   const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
 
-  // Parse Excel file and extract responses
+  // Parse Excel file and extract responses - IMPROVED VERSION
   const parseExcelFile = async (file: File): Promise<string[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       
       reader.onload = (e) => {
         try {
+          console.log("Reading Excel file data...");
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Debug available sheets
+          console.log("Available sheets:", workbook.SheetNames);
+          
+          if (workbook.SheetNames.length === 0) {
+            reject(new Error('No worksheets found in the Excel file'));
+            return;
+          }
           
           // Get the first sheet
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
           
-          // Convert to JSON
-          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+          // Debug worksheet structure
+          console.log("Worksheet range:", worksheet['!ref']);
           
-          // Try to find response column - look for common names
-          const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text'];
-          let responseColumn = '';
+          // Convert to JSON with header: true to use first row as headers
+          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1, defval: "" });
           
-          if (jsonData.length > 0) {
-            const firstRow = jsonData[0];
-            const headers = Object.keys(firstRow);
+          console.log("Excel rows found:", jsonData.length);
+          console.log("First few rows:", jsonData.slice(0, 3));
+          
+          if (jsonData.length === 0) {
+            reject(new Error('No data rows found in the Excel file'));
+            return;
+          }
+          
+          // Try to find responses in different ways
+          let responses: string[] = [];
+          
+          // First approach: Look for a header row and find a column with common response names
+          const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text', 'comments', 'open text', 'opentext', 'open-text', 'open_text', 'open ended', 'open-ended', 'openended'];
+          
+          // Check if first row might be headers
+          if (jsonData.length > 1 && Array.isArray(jsonData[0])) {
+            const headers = jsonData[0] as string[];
+            console.log("Potential headers:", headers);
             
-            // Try to find a column that matches our expected response column names
-            for (const column of headers) {
-              if (possibleColumns.includes(column.toLowerCase())) {
-                responseColumn = column;
-                break;
+            // Find potential response column indices
+            const responseColumnIndices: number[] = [];
+            
+            headers.forEach((header, index) => {
+              if (header && typeof header === 'string') {
+                const headerLower = header.toLowerCase();
+                if (possibleColumns.some(col => headerLower.includes(col))) {
+                  responseColumnIndices.push(index);
+                }
+              }
+            });
+            
+            console.log("Potential response columns:", responseColumnIndices);
+            
+            // If we found potential response columns, extract them
+            if (responseColumnIndices.length > 0) {
+              // Use the first identified response column
+              const columnIndex = responseColumnIndices[0];
+              responses = jsonData
+                .slice(1) // Skip header row
+                .map(row => {
+                  if (Array.isArray(row) && row[columnIndex] !== undefined) {
+                    return String(row[columnIndex]).trim();
+                  }
+                  return '';
+                })
+                .filter(text => text !== '');
+                
+              console.log(`Found ${responses.length} responses in column ${columnIndex} (${headers[columnIndex]})`);
+            }
+          }
+          
+          // If no responses found yet, try second approach: Look for text in any column
+          if (responses.length === 0) {
+            console.log("No responses found with headers approach, checking all text data");
+            
+            // Look for the first column that has a good number of text entries
+            const textColumns: {index: number, textCount: number}[] = [];
+            
+            // Analyze each column
+            const maxColIndex = Math.max(...jsonData.map(row => Array.isArray(row) ? row.length : 0));
+            
+            for (let colIndex = 0; colIndex < maxColIndex; colIndex++) {
+              const textEntries = jsonData
+                .filter((row, rowIndex) => rowIndex > 0 && Array.isArray(row)) // Skip header row
+                .filter(row => {
+                  const cell = row[colIndex];
+                  return cell !== undefined && 
+                         cell !== null && 
+                         cell !== "" && 
+                         typeof cell === 'string' && 
+                         cell.trim().length > 10; // Look for longer text entries
+                });
+              
+              if (textEntries.length > 0) {
+                textColumns.push({
+                  index: colIndex,
+                  textCount: textEntries.length
+                });
               }
             }
             
-            // If no match found, use the first text column
-            if (!responseColumn && headers.length > 0) {
-              responseColumn = headers[0];
-            }
+            // Sort columns by number of text entries (most to least)
+            textColumns.sort((a, b) => b.textCount - a.textCount);
+            console.log("Potential text columns:", textColumns);
             
-            if (responseColumn) {
-              const responses = jsonData
-                .map(row => row[responseColumn])
-                .filter(response => typeof response === 'string' && response.trim() !== '');
-              
-              resolve(responses);
-            } else {
-              reject(new Error('Could not find a suitable response column'));
+            if (textColumns.length > 0) {
+              // Use the column with the most text entries
+              const bestColumnIndex = textColumns[0].index;
+              responses = jsonData
+                .slice(1) // Skip header row
+                .map(row => {
+                  if (Array.isArray(row) && row[bestColumnIndex] !== undefined) {
+                    const value = row[bestColumnIndex];
+                    return typeof value === 'string' ? value.trim() : String(value).trim();
+                  }
+                  return '';
+                })
+                .filter(text => text !== '');
+                
+              console.log(`Found ${responses.length} responses in column index ${bestColumnIndex}`);
             }
+          }
+          
+          // If still no responses, try third approach: Get any non-empty cell as a last resort
+          if (responses.length === 0) {
+            console.log("Still no responses found, getting any non-empty cells");
+            
+            responses = jsonData.flatMap(row => {
+              if (!Array.isArray(row)) return [];
+              
+              return row
+                .filter(cell => cell !== undefined && cell !== null && cell !== "")
+                .map(cell => typeof cell === 'string' ? cell.trim() : String(cell).trim())
+                .filter(text => text.length > 5); // Only include somewhat meaningful text
+            });
+            
+            console.log(`Found ${responses.length} text cells across all columns`);
+          }
+          
+          if (responses.length === 0) {
+            reject(new Error('No valid responses found in the Excel file. Please check the file format or try a different file.'));
           } else {
-            reject(new Error('No data found in the Excel file'));
+            // Success! Return the found responses
+            resolve(responses);
           }
         } catch (error) {
-          reject(error);
+          console.error("Excel parsing error:", error);
+          reject(new Error(`Error parsing Excel file: ${error instanceof Error ? error.message : "Unknown error"}`));
         }
       };
       
