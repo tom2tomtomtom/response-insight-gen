@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry } from '../types';
 import { toast } from '../components/ui/use-toast';
@@ -96,19 +95,26 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
-  // Parse CSV file and extract responses
+  // Parse CSV file and extract responses - IMPROVED VERSION
   const parseCSVFile = async (file: File): Promise<string[]> => {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
         header: true,
+        skipEmptyLines: true,
         complete: (results) => {
           try {
+            console.log("CSV parsing results:", results);
+            
             if (results.data && results.data.length > 0) {
-              // Try to find response column - look for common names
-              const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text'];
+              // Debug what columns are available
               const firstRow = results.data[0] as Record<string, any>;
-              const headers = Object.keys(firstRow);
+              console.log("CSV first row:", firstRow);
               
+              const headers = Object.keys(firstRow);
+              console.log("CSV headers:", headers);
+              
+              // Try to find response column - look for common names
+              const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text', 'comments'];
               let responseColumn = '';
               
               // Try to find a column that matches our expected response column names
@@ -119,28 +125,72 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
                 }
               }
               
-              // If no match found, use the first column
+              // If no match found, use the first column that has text values
               if (!responseColumn && headers.length > 0) {
-                responseColumn = headers[0];
+                // Try each column until we find one with text values
+                for (const header of headers) {
+                  const sampleValues = results.data
+                    .slice(0, 5)
+                    .map((row: any) => row[header])
+                    .filter((val: any) => val !== undefined && val !== null && val !== "");
+                  
+                  if (sampleValues.length > 0) {
+                    responseColumn = header;
+                    break;
+                  }
+                }
+                
+                // If still no match, use the first header
+                if (!responseColumn && headers.length > 0) {
+                  responseColumn = headers[0];
+                }
               }
+              
+              console.log("Selected response column:", responseColumn);
               
               if (responseColumn) {
                 const responses = results.data
                   .map((row: any) => row[responseColumn])
                   .filter((response: any) => typeof response === 'string' && response.trim() !== '');
                 
-                resolve(responses);
+                console.log("Found responses:", responses.length);
+                
+                if (responses.length === 0) {
+                  // If we didn't find valid responses in the selected column, try any non-empty string in any column
+                  const allResponses: string[] = [];
+                  
+                  results.data.forEach((row: any) => {
+                    for (const key of Object.keys(row)) {
+                      const value = row[key];
+                      if (typeof value === 'string' && value.trim() !== '') {
+                        allResponses.push(value);
+                      }
+                    }
+                  });
+                  
+                  console.log("Found alternative responses:", allResponses.length);
+                  
+                  if (allResponses.length > 0) {
+                    resolve(allResponses);
+                  } else {
+                    reject(new Error('No valid responses found in the CSV file. Please check the format.'));
+                  }
+                } else {
+                  resolve(responses);
+                }
               } else {
-                reject(new Error('Could not find a suitable response column'));
+                reject(new Error('Could not find a suitable response column in the CSV file.'));
               }
             } else {
-              reject(new Error('No data found in the CSV file'));
+              reject(new Error('No data found in the CSV file or file is empty.'));
             }
           } catch (error) {
-            reject(error);
+            console.error("CSV parsing error:", error);
+            reject(new Error(`Error parsing CSV: ${error instanceof Error ? error.message : "Unknown error"}`));
           }
         },
         error: (error) => {
+          console.error("PapaParse error:", error);
           reject(new Error(`Error parsing CSV: ${error.message}`));
         }
       });
@@ -156,16 +206,20 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       let responses: string[] = [];
       
       // Parse file based on type
-      if (file.name.endsWith('.csv')) {
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        console.log("Parsing CSV file:", file.name);
         responses = await parseCSVFile(file);
-      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      } else if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+        console.log("Parsing Excel file:", file.name);
         responses = await parseExcelFile(file);
       } else {
         throw new Error('Unsupported file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
       }
       
+      console.log("Total responses found:", responses.length);
+      
       if (responses.length === 0) {
-        throw new Error('No valid responses found in the file');
+        throw new Error('No valid responses found in the file. Please check the file format.');
       }
       
       setRawResponses(responses);

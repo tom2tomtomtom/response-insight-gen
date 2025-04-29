@@ -3,12 +3,20 @@ import React, { useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { useProcessing } from '../contexts/ProcessingContext';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, AlertCircle } from 'lucide-react';
+import { toast } from './ui/use-toast';
 
 const FileUploader: React.FC = () => {
   const { handleFileUpload, isUploading } = useProcessing();
   const [dragActive, setDragActive] = useState(false);
+  const [dragError, setDragError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const validateFileType = (file: File): boolean => {
+    const validTypes = ['.xlsx', '.xls', '.csv'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    return validTypes.includes(fileExtension);
+  };
   
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -25,15 +33,38 @@ const FileUploader: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    setDragError(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileUpload(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      
+      if (validateFileType(file)) {
+        handleFileUpload(file);
+      } else {
+        setDragError(true);
+        toast({
+          variant: "destructive",
+          title: "Invalid File Format",
+          description: "Please upload an Excel (.xlsx, .xls) or CSV (.csv) file."
+        });
+        setTimeout(() => setDragError(false), 3000);
+      }
     }
   };
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleFileUpload(e.target.files[0]);
+      const file = e.target.files[0];
+      
+      if (validateFileType(file)) {
+        handleFileUpload(file);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Invalid File Format",
+          description: "Please upload an Excel (.xlsx, .xls) or CSV (.csv) file."
+        });
+      }
     }
   };
   
@@ -52,6 +83,7 @@ const FileUploader: React.FC = () => {
       <CardContent>
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center ${
+            dragError ? 'border-destructive bg-destructive/5' : 
             dragActive ? 'border-primary bg-primary/5' : 'border-muted'
           } transition-colors duration-200 cursor-pointer`}
           onDragEnter={handleDrag}
@@ -70,8 +102,12 @@ const FileUploader: React.FC = () => {
           />
           
           <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="p-3 rounded-full bg-muted">
-              <Upload className="h-8 w-8 text-primary" />
+            <div className={`p-3 rounded-full ${dragError ? 'bg-destructive/10' : 'bg-muted'}`}>
+              {dragError ? (
+                <AlertCircle className="h-8 w-8 text-destructive" />
+              ) : (
+                <Upload className="h-8 w-8 text-primary" />
+              )}
             </div>
             
             {isUploading ? (
@@ -79,6 +115,15 @@ const FileUploader: React.FC = () => {
                 <Loader2 className="h-6 w-6 text-primary animate-spin" />
                 <p className="text-muted-foreground text-sm">Uploading...</p>
               </div>
+            ) : dragError ? (
+              <>
+                <p className="font-medium text-destructive">
+                  Invalid file format
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Please upload an Excel (.xlsx, .xls) or CSV (.csv) file
+                </p>
+              </>
             ) : (
               <>
                 <p className="font-medium">
