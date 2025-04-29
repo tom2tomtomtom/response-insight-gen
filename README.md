@@ -1,73 +1,44 @@
-# Welcome to your Lovable project
 
-## Project info
+# Verbatim Coder
 
-**URL**: https://lovable.dev/projects/f667a0f3-a3d9-43dc-b7ea-3446b9b2dfe1
+## Overview
+Verbatim Coder is an AI-powered tool for analyzing open-ended survey responses. It automatically generates a structured codeframe and assigns relevant codes to each response.
 
-## How can I edit this code?
+## Features
+- Upload Excel files containing survey responses
+- AI-powered theme detection and response classification
+- Generates a comprehensive codeframe with codes, labels, definitions, and examples
+- Maps each response to relevant codes
+- Downloads results as an Excel file with two sheets (Codeframe and Coded Responses)
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/f667a0f3-a3d9-43dc-b7ea-3446b9b2dfe1) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
+## Tech Stack
 - React
-- shadcn-ui
+- TypeScript
 - Tailwind CSS
+- shadcn/ui components
+- OpenAI API (backend integration)
+- Supabase (for storage and database)
 
-## How can I deploy this project?
+## Project Status
+This is an MVP (Minimum Viable Product) demonstration version. In a production version, the application would integrate with actual backend services for processing files through OpenAI's API and storing results in Supabase.
 
-Simply open [Lovable](https://lovable.dev/projects/f667a0f3-a3d9-43dc-b7ea-3446b9b2dfe1) and click on Share -> Publish.
+## Development
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Start the development server: `npm run dev`
+4. Open your browser and navigate to the provided local URL
 
-## Can I connect a custom domain to my Lovable project?
+## Backend Integration
+The current frontend implementation uses mock data and simulated processing. In a production environment, you would need to:
 
-Yes, you can!
+1. Set up a FastAPI backend service
+2. Configure OpenAI API integration
+3. Establish Supabase for file storage and database operations
+4. Implement file processing logic with proper error handling
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## Environment Variables
+For a complete implementation, you would need to configure:
+- `OPENAI_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `SUPABASE_BUCKET_NAME`
