@@ -16,6 +16,8 @@ export interface CodeframeEntry {
 export interface CodedResponse {
   responseText: string;
   codesAssigned: string[];
+  columnName?: string; // Add column name to preserve context
+  columnIndex?: number; // Add column index for reference
 }
 
 export interface ProcessedResult {
@@ -35,4 +37,20 @@ export interface ApiConfig {
   apiKey: string;
   apiUrl: string;
   isConfigured: boolean;
+}
+
+export interface ColumnStats {
+  textPercentage: number;  // Percentage of cells that contain text
+  numericPercentage: number; // Percentage of cells that contain numbers
+  textLength: number;  // Average length of text in the column
+  nonEmptyCount: number; // Count of non-empty cells
+  totalCount: number;  // Total cells in column
+}
+
+export interface ColumnInfo {
+  index: number;  // Column index
+  name: string;   // Column name/header
+  type: 'text' | 'numeric' | 'mixed' | 'empty'; // Type of data in the column
+  examples: string[]; // Example values (first few values)
+  stats: ColumnStats; // Statistics about the column
 }

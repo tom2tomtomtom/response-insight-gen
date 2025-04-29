@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { useProcessing } from '../contexts/ProcessingContext';
-import { Loader2, Upload, AlertCircle, FileQuestion } from 'lucide-react';
+import { Loader2, Upload, AlertCircle, FileQuestion, Info } from 'lucide-react';
 import { toast } from './ui/use-toast';
 
 const FileUploader: React.FC = () => {
@@ -144,16 +144,22 @@ const FileUploader: React.FC = () => {
                   Upload an Excel or CSV file containing your survey responses
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  For best results, make sure your file contains a column with text responses
+                  You'll be able to select specific columns with open-ended responses
                 </p>
                 <div className="mt-2 text-xs text-muted-foreground p-2 bg-gray-50 rounded border border-gray-100">
                   <p className="font-semibold mb-1">Tips for successful uploads:</p>
                   <ul className="list-disc list-inside space-y-1 text-left">
-                    <li>Use column headers like "Response", "Comments", or "Feedback"</li>
-                    <li>Make sure text responses are in a single column</li>
+                    <li>Files with mixed numeric and text data are supported</li>
+                    <li>You'll be prompted to select columns with open-ended responses</li>
+                    <li>Column headers help identify question types</li>
                     <li>Remove empty rows at the beginning of your file</li>
-                    <li>For Excel: Save as .xlsx format</li>
                   </ul>
+                </div>
+                <div className="mt-2 flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-100">
+                  <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                  <p className="text-xs text-blue-700 text-left">
+                    <strong>New!</strong> Our improved column detection automatically identifies open-ended questions in your data
+                  </p>
                 </div>
               </>
             )}

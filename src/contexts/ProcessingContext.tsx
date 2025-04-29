@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig } from '../types';
+import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { 
   uploadFile, 
@@ -7,7 +8,8 @@ import {
   getProcessingResult, 
   generateExcelFile, 
   testApiConnection, 
-  setUserResponses 
+  setUserResponses,
+  setSelectedColumns
 } from '../services/api';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -22,12 +24,17 @@ interface ProcessingContextType {
   isGeneratingExcel: boolean;
   rawResponses: string[];
   apiConfig: ApiConfig | null;
+  fileColumns: ColumnInfo[];
+  selectedColumns: number[];
+  searchQuery: string;
   setApiConfig: (config: ApiConfig) => void;
   testApiConnection: (apiKey: string, apiUrl: string) => Promise<boolean>;
   handleFileUpload: (file: File) => Promise<void>;
   startProcessing: () => Promise<void>;
   downloadResults: () => Promise<void>;
   resetState: () => void;
+  toggleColumnSelection: (columnIndex: number) => void;
+  setSearchQuery: (query: string) => void;
 }
 
 const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
@@ -42,9 +49,110 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
   const [rawResponses, setRawResponses] = useState<string[]>([]);
   const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
+  const [fileColumns, setFileColumns] = useState<ColumnInfo[]>([]);
+  const [selectedColumns, setSelectedColumns] = useState<number[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Parse Excel file and extract responses - IMPROVED VERSION
-  const parseExcelFile = async (file: File): Promise<string[]> => {
+  // Analyze a sample of values to determine column type and statistics
+  const analyzeColumnValues = (values: any[]): { 
+    type: 'text' | 'numeric' | 'mixed' | 'empty', 
+    stats: { 
+      textPercentage: number,
+      numericPercentage: number,
+      textLength: number,
+      nonEmptyCount: number,
+      totalCount: number
+    } 
+  } => {
+    if (!values || values.length === 0) {
+      return { 
+        type: 'empty', 
+        stats: { 
+          textPercentage: 0, 
+          numericPercentage: 0, 
+          textLength: 0,
+          nonEmptyCount: 0,
+          totalCount: 0
+        } 
+      };
+    }
+
+    const totalCount = values.length;
+    let textCount = 0;
+    let numericCount = 0;
+    let totalTextLength = 0;
+    let nonEmptyCount = 0;
+
+    // Analyze each value
+    values.forEach(value => {
+      // Skip empty values
+      if (value === undefined || value === null || value === '') {
+        return;
+      }
+
+      nonEmptyCount++;
+      const strValue = String(value).trim();
+      
+      // Check if it's a number
+      const isNumeric = !isNaN(Number(strValue)) && strValue !== '';
+      
+      if (isNumeric) {
+        numericCount++;
+      } else {
+        textCount++;
+        // Only count length for non-numeric values
+        totalTextLength += strValue.length;
+      }
+    });
+
+    const textPercentage = nonEmptyCount > 0 ? (textCount / nonEmptyCount) * 100 : 0;
+    const numericPercentage = nonEmptyCount > 0 ? (numericCount / nonEmptyCount) * 100 : 0;
+    const avgTextLength = textCount > 0 ? totalTextLength / textCount : 0;
+
+    // Determine column type based on percentages
+    let type: 'text' | 'numeric' | 'mixed' | 'empty' = 'empty';
+    if (nonEmptyCount === 0) {
+      type = 'empty';
+    } else if (textPercentage > 90) {
+      type = 'text';
+    } else if (numericPercentage > 90) {
+      type = 'numeric';
+    } else {
+      type = 'mixed';
+    }
+
+    // Additional heuristic: If average text length is high, consider it text regardless
+    if (avgTextLength > 30 && textCount > 0) {
+      type = 'text';
+    }
+
+    return {
+      type,
+      stats: {
+        textPercentage,
+        numericPercentage,
+        textLength: avgTextLength,
+        nonEmptyCount,
+        totalCount
+      }
+    };
+  };
+
+  // Get column names from headers if available, otherwise generate placeholders
+  const getColumnNames = (
+    headers: string[] | null, 
+    columnCount: number
+  ): string[] => {
+    if (headers && headers.length > 0) {
+      return headers.map(header => header.trim() || 'Unnamed Column');
+    }
+    
+    // Generate generic column names if no headers
+    return Array(columnCount).fill(0).map((_, i) => `Column ${i + 1}`);
+  };
+
+  // Improved Excel file parsing
+  const parseExcelFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[] }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       
@@ -69,134 +177,120 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
           // Debug worksheet structure
           console.log("Worksheet range:", worksheet['!ref']);
           
-          // Convert to JSON with header: true to use first row as headers
+          // Convert to JSON with header option
           const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1, defval: "" });
           
           console.log("Excel rows found:", jsonData.length);
-          console.log("First few rows:", jsonData.slice(0, 3));
           
           if (jsonData.length === 0) {
             reject(new Error('No data rows found in the Excel file'));
             return;
           }
           
-          // Try to find responses in different ways
-          let responses: string[] = [];
-          
-          // First approach: Look for a header row and find a column with common response names
-          const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text', 'comments', 'open text', 'opentext', 'open-text', 'open_text', 'open ended', 'open-ended', 'openended'];
-          
-          // Check if first row might be headers
-          if (jsonData.length > 1 && Array.isArray(jsonData[0])) {
-            const headers = jsonData[0] as string[];
-            console.log("Potential headers:", headers);
+          // Extract headers (first row)
+          const headers = jsonData.length > 0 && Array.isArray(jsonData[0]) 
+            ? jsonData[0].map(String)
+            : null;
             
-            // Find potential response column indices
-            const responseColumnIndices: number[] = [];
-            
-            headers.forEach((header, index) => {
-              if (header && typeof header === 'string') {
-                const headerLower = header.toLowerCase();
-                if (possibleColumns.some(col => headerLower.includes(col))) {
-                  responseColumnIndices.push(index);
+          // Determine if the first row looks like headers
+          const hasHeaders = headers && headers.some(header => 
+            typeof header === 'string' && 
+            header.trim().length > 0 && 
+            /^[A-Za-z\s_\-0-9?]+$/.test(header) // Simple regex to identify potential headers
+          );
+          
+          // Extract data rows (skip header if it exists)
+          const dataRows = hasHeaders ? jsonData.slice(1) : jsonData;
+          
+          // Transpose the data to get column-oriented arrays
+          const columnCount = Math.max(...dataRows.map((row: any) => 
+            Array.isArray(row) ? row.length : 0
+          ));
+          
+          // Initialize column arrays
+          const columns: any[][] = Array(columnCount).fill(0).map(() => []);
+          
+          // Fill the column arrays
+          dataRows.forEach((row: any) => {
+            if (Array.isArray(row)) {
+              for (let i = 0; i < columnCount; i++) {
+                if (i < row.length) {
+                  columns[i].push(row[i]);
+                } else {
+                  columns[i].push("");
                 }
               }
+            }
+          });
+          
+          // Get column names (from headers or generate placeholders)
+          const columnNames = getColumnNames(
+            hasHeaders ? headers : null, 
+            columnCount
+          );
+          
+          // Analyze each column
+          const columnInfos: ColumnInfo[] = [];
+          const textResponses: string[] = [];
+          
+          columns.forEach((columnData, index) => {
+            const { type, stats } = analyzeColumnValues(columnData);
+            
+            // Include keywords that suggest open-ended questions
+            const openEndedKeywords = ['comment', 'feedback', 'opinion', 'suggestion', 'describe', 'explain', 'tell', 'elaborate', 'why', 'how', 'open'];
+            
+            // Check if column name suggests it's an open-ended question
+            let columnNameSuggestsOpenEnded = false;
+            if (columnNames[index]) {
+              const colNameLower = columnNames[index].toLowerCase();
+              columnNameSuggestsOpenEnded = openEndedKeywords.some(keyword => 
+                colNameLower.includes(keyword)
+              );
+            }
+            
+            // Get non-empty examples
+            const examples = columnData
+              .filter((value: any) => value !== undefined && value !== null && value !== '')
+              .slice(0, 2)
+              .map(String);
+              
+            columnInfos.push({
+              index,
+              name: columnNames[index],
+              type: columnNameSuggestsOpenEnded && examples.length > 0 ? 'text' : type,
+              examples,
+              stats
             });
             
-            console.log("Potential response columns:", responseColumnIndices);
-            
-            // If we found potential response columns, extract them
-            if (responseColumnIndices.length > 0) {
-              // Use the first identified response column
-              const columnIndex = responseColumnIndices[0];
-              responses = jsonData
-                .slice(1) // Skip header row
-                .map(row => {
-                  if (Array.isArray(row) && row[columnIndex] !== undefined) {
-                    return String(row[columnIndex]).trim();
-                  }
-                  return '';
-                })
-                .filter(text => text !== '');
+            // Collect text responses from text columns for backward compatibility
+            if (type === 'text' || columnNameSuggestsOpenEnded) {
+              const validResponses = columnData
+                .filter((value: any) => 
+                  value !== undefined && 
+                  value !== null && 
+                  value !== '' &&
+                  String(value).trim().length > 5 // Only include substantive responses
+                )
+                .map(String);
                 
-              console.log(`Found ${responses.length} responses in column ${columnIndex} (${headers[columnIndex]})`);
+              textResponses.push(...validResponses);
             }
-          }
+          });
           
-          // If no responses found yet, try second approach: Look for text in any column
-          if (responses.length === 0) {
-            console.log("No responses found with headers approach, checking all text data");
+          // Auto-select text columns
+          const autoSelectedColumns = columnInfos
+            .filter(col => col.type === 'text')
+            .map(col => col.index);
             
-            // Look for the first column that has a good number of text entries
-            const textColumns: {index: number, textCount: number}[] = [];
-            
-            // Analyze each column
-            const maxColIndex = Math.max(...jsonData.map(row => Array.isArray(row) ? row.length : 0));
-            
-            for (let colIndex = 0; colIndex < maxColIndex; colIndex++) {
-              const textEntries = jsonData
-                .filter((row, rowIndex) => rowIndex > 0 && Array.isArray(row)) // Skip header row
-                .filter(row => {
-                  const cell = row[colIndex];
-                  return cell !== undefined && 
-                         cell !== null && 
-                         cell !== "" && 
-                         typeof cell === 'string' && 
-                         cell.trim().length > 10; // Look for longer text entries
-                });
-              
-              if (textEntries.length > 0) {
-                textColumns.push({
-                  index: colIndex,
-                  textCount: textEntries.length
-                });
-              }
-            }
-            
-            // Sort columns by number of text entries (most to least)
-            textColumns.sort((a, b) => b.textCount - a.textCount);
-            console.log("Potential text columns:", textColumns);
-            
-            if (textColumns.length > 0) {
-              // Use the column with the most text entries
-              const bestColumnIndex = textColumns[0].index;
-              responses = jsonData
-                .slice(1) // Skip header row
-                .map(row => {
-                  if (Array.isArray(row) && row[bestColumnIndex] !== undefined) {
-                    const value = row[bestColumnIndex];
-                    return typeof value === 'string' ? value.trim() : String(value).trim();
-                  }
-                  return '';
-                })
-                .filter(text => text !== '');
-                
-              console.log(`Found ${responses.length} responses in column index ${bestColumnIndex}`);
-            }
-          }
+          setSelectedColumns(autoSelectedColumns);
           
-          // If still no responses, try third approach: Get any non-empty cell as a last resort
-          if (responses.length === 0) {
-            console.log("Still no responses found, getting any non-empty cells");
-            
-            responses = jsonData.flatMap(row => {
-              if (!Array.isArray(row)) return [];
-              
-              return row
-                .filter(cell => cell !== undefined && cell !== null && cell !== "")
-                .map(cell => typeof cell === 'string' ? cell.trim() : String(cell).trim())
-                .filter(text => text.length > 5); // Only include somewhat meaningful text
-            });
-            
-            console.log(`Found ${responses.length} text cells across all columns`);
-          }
+          console.log(`Found ${columnInfos.length} columns, ${autoSelectedColumns.length} text columns`);
           
-          if (responses.length === 0) {
-            reject(new Error('No valid responses found in the Excel file. Please check the file format or try a different file.'));
-          } else {
-            // Success! Return the found responses
-            resolve(responses);
-          }
+          // Return both column info and text responses
+          resolve({ 
+            columns: columnInfos,
+            responses: textResponses
+          });
         } catch (error) {
           console.error("Excel parsing error:", error);
           reject(new Error(`Error parsing Excel file: ${error instanceof Error ? error.message : "Unknown error"}`));
@@ -211,95 +305,122 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
-  // Parse CSV file and extract responses - IMPROVED VERSION
-  const parseCSVFile = async (file: File): Promise<string[]> => {
+  // Improved CSV file parsing
+  const parseCSVFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[] }> => {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
-        header: true,
+        header: false, // We'll handle headers ourselves
         skipEmptyLines: true,
         complete: (results) => {
           try {
             console.log("CSV parsing results:", results);
             
-            if (results.data && results.data.length > 0) {
-              // Debug what columns are available
-              const firstRow = results.data[0] as Record<string, any>;
-              console.log("CSV first row:", firstRow);
-              
-              const headers = Object.keys(firstRow);
-              console.log("CSV headers:", headers);
-              
-              // Try to find response column - look for common names
-              const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text', 'comments'];
-              let responseColumn = '';
-              
-              // Try to find a column that matches our expected response column names
-              for (const column of headers) {
-                if (possibleColumns.includes(column.toLowerCase())) {
-                  responseColumn = column;
-                  break;
-                }
-              }
-              
-              // If no match found, use the first column that has text values
-              if (!responseColumn && headers.length > 0) {
-                // Try each column until we find one with text values
-                for (const header of headers) {
-                  const sampleValues = results.data
-                    .slice(0, 5)
-                    .map((row: any) => row[header])
-                    .filter((val: any) => val !== undefined && val !== null && val !== "");
-                  
-                  if (sampleValues.length > 0) {
-                    responseColumn = header;
-                    break;
-                  }
-                }
-                
-                // If still no match, use the first header
-                if (!responseColumn && headers.length > 0) {
-                  responseColumn = headers[0];
-                }
-              }
-              
-              console.log("Selected response column:", responseColumn);
-              
-              if (responseColumn) {
-                const responses = results.data
-                  .map((row: any) => row[responseColumn])
-                  .filter((response: any) => typeof response === 'string' && response.trim() !== '');
-                
-                console.log("Found responses:", responses.length);
-                
-                if (responses.length === 0) {
-                  // If we didn't find valid responses in the selected column, try any non-empty string in any column
-                  const allResponses: string[] = [];
-                  
-                  results.data.forEach((row: any) => {
-                    for (const key of Object.keys(row)) {
-                      const value = row[key];
-                      if (typeof value === 'string' && value.trim() !== '') {
-                        allResponses.push(value);
-                      }
-                    }
-                  });
-                  
-                  console.log("Found alternative responses:", allResponses.length);
-                  
-                  if (allResponses.length > 0) {
-                    resolve(allResponses);
-                  } else {
-                    reject(new Error('No valid responses found in the CSV file. Please check the format.'));
-                  }
-                } else {
-                  resolve(responses);
-                }
-              } else {
-                reject(new Error('Could not find a suitable response column in the CSV file.'));
-              }
-            } else {
-              reject(new Error('No data found in the CSV file or file is empty.'));
+            if (!results.data || results.data.length === 0) {
+              reject(new Error('No data found in the CSV file'));
+              return;
             }
+            
+            // Check if the first row looks like headers
+            const firstRow = results.data[0] as any[];
+            const hasHeaders = firstRow.some(cell => 
+              typeof cell === 'string' && 
+              cell.trim().length > 0 && 
+              /^[A-Za-z\s_\-0-9?]+$/.test(cell) // Simple regex to identify potential headers
+            );
+            
+            // Extract headers and data rows
+            const headers = hasHeaders ? firstRow.map(String) : null;
+            const dataRows = hasHeaders ? results.data.slice(1) : results.data;
+            
+            // Get the maximum column count
+            const columnCount = Math.max(...dataRows.map((row: any) => 
+              Array.isArray(row) ? row.length : 0
+            ));
+            
+            // Initialize column arrays
+            const columns: any[][] = Array(columnCount).fill(0).map(() => []);
+            
+            // Fill the column arrays
+            dataRows.forEach((row: any) => {
+              if (Array.isArray(row)) {
+                for (let i = 0; i < columnCount; i++) {
+                  if (i < row.length) {
+                    columns[i].push(row[i]);
+                  } else {
+                    columns[i].push("");
+                  }
+                }
+              }
+            });
+            
+            // Get column names from headers or generate placeholders
+            const columnNames = getColumnNames(
+              hasHeaders ? headers : null, 
+              columnCount
+            );
+            
+            // Analyze each column
+            const columnInfos: ColumnInfo[] = [];
+            const textResponses: string[] = [];
+            
+            columns.forEach((columnData, index) => {
+              const { type, stats } = analyzeColumnValues(columnData);
+              
+              // Include keywords that suggest open-ended questions
+              const openEndedKeywords = ['comment', 'feedback', 'opinion', 'suggestion', 'describe', 'explain', 'tell', 'elaborate', 'why', 'how', 'open'];
+              
+              // Check if column name suggests it's an open-ended question
+              let columnNameSuggestsOpenEnded = false;
+              if (columnNames[index]) {
+                const colNameLower = columnNames[index].toLowerCase();
+                columnNameSuggestsOpenEnded = openEndedKeywords.some(keyword => 
+                  colNameLower.includes(keyword)
+                );
+              }
+              
+              // Get non-empty examples
+              const examples = columnData
+                .filter((value: any) => value !== undefined && value !== null && value !== '')
+                .slice(0, 2)
+                .map(String);
+                
+              columnInfos.push({
+                index,
+                name: columnNames[index],
+                type: columnNameSuggestsOpenEnded && examples.length > 0 ? 'text' : type,
+                examples,
+                stats
+              });
+              
+              // Collect text responses from text columns for backward compatibility
+              if (type === 'text' || columnNameSuggestsOpenEnded) {
+                const validResponses = columnData
+                  .filter((value: any) => 
+                    value !== undefined && 
+                    value !== null && 
+                    value !== '' &&
+                    String(value).trim().length > 5 // Only include substantive responses
+                  )
+                  .map(String);
+                  
+                textResponses.push(...validResponses);
+              }
+            });
+            
+            // Auto-select text columns
+            const autoSelectedColumns = columnInfos
+              .filter(col => col.type === 'text')
+              .map(col => col.index);
+              
+            setSelectedColumns(autoSelectedColumns);
+            
+            console.log(`Found ${columnInfos.length} columns, ${autoSelectedColumns.length} text columns`);
+            
+            // Return both column info and text responses
+            resolve({ 
+              columns: columnInfos,
+              responses: textResponses
+            });
           } catch (error) {
             console.error("CSV parsing error:", error);
             reject(new Error(`Error parsing CSV: ${error instanceof Error ? error.message : "Unknown error"}`));
@@ -332,31 +453,42 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  // Toggle column selection
+  const toggleColumnSelection = (columnIndex: number) => {
+    setSelectedColumns(prev => {
+      if (prev.includes(columnIndex)) {
+        return prev.filter(idx => idx !== columnIndex);
+      } else {
+        return [...prev, columnIndex];
+      }
+    });
+  };
+
   // Handle file upload
   const handleFileUpload = async (file: File) => {
     try {
       setIsUploading(true);
       setProcessingStatus('Parsing file...');
       
-      let responses: string[] = [];
+      let parseResult: { columns: ColumnInfo[], responses: string[] };
       
       // Parse file based on type
       if (file.name.toLowerCase().endsWith('.csv')) {
         console.log("Parsing CSV file:", file.name);
-        responses = await parseCSVFile(file);
+        parseResult = await parseCSVFile(file);
       } else if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
         console.log("Parsing Excel file:", file.name);
-        responses = await parseExcelFile(file);
+        parseResult = await parseExcelFile(file);
       } else {
         throw new Error('Unsupported file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
       }
       
-      console.log("Total responses found:", responses.length);
+      const { columns, responses } = parseResult;
       
-      if (responses.length === 0) {
-        throw new Error('No valid responses found in the file. Please check the file format.');
-      }
+      console.log("Total columns found:", columns.length);
+      console.log("Total text responses found:", responses.length);
       
+      setFileColumns(columns);
       setRawResponses(responses);
       setUserResponses(responses);
       
@@ -370,10 +502,19 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       }
       
       setUploadedFile(response.data);
-      toast({
-        title: "File Uploaded",
-        description: `Successfully uploaded ${file.name} with ${responses.length} responses`,
-      });
+      
+      if (columns.some(col => col.type === 'text')) {
+        toast({
+          title: "File Uploaded Successfully",
+          description: `Found ${columns.filter(col => col.type === 'text').length} text response columns. Please select which to analyze.`,
+        });
+      } else {
+        toast({
+          variant: "warning",
+          title: "File Uploaded",
+          description: "No text columns were automatically detected. Please manually select columns with text responses.",
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -397,10 +538,22 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       return;
     }
 
+    if (selectedColumns.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No Columns Selected",
+        description: "Please select at least one column to process",
+      });
+      return;
+    }
+
     try {
       setIsProcessing(true);
-      setProcessingStatus('Starting analysis...');
+      setProcessingStatus('Preparing selected columns...');
       setProcessingProgress(10);
+      
+      // Send selected columns to API
+      setSelectedColumns(fileColumns.filter(col => selectedColumns.includes(col.index)));
       
       const response = await processFile(uploadedFile.id, apiConfig || undefined);
       
@@ -456,7 +609,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       toast({
         title: "Analysis Complete",
-        description: "Your survey responses have been processed successfully",
+        description: `Successfully analyzed ${response.data.codedResponses.length} responses from ${selectedColumns.length} columns`,
       });
     } catch (error) {
       toast({
@@ -521,6 +674,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setResults(null);
     setIsGeneratingExcel(false);
     setRawResponses([]);
+    setFileColumns([]);
+    setSelectedColumns([]);
+    setSearchQuery('');
     // Note: We don't reset the API config on purpose
   };
 
@@ -534,12 +690,17 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     isGeneratingExcel,
     rawResponses,
     apiConfig,
+    fileColumns,
+    selectedColumns,
+    searchQuery,
     setApiConfig,
     testApiConnection: handleTestApiConnection,
     handleFileUpload,
     startProcessing,
     downloadResults,
-    resetState
+    resetState,
+    toggleColumnSelection,
+    setSearchQuery
   };
 
   return (

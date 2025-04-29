@@ -10,10 +10,11 @@ import FilePreview from '../components/FilePreview';
 import ProcessingStatus from '../components/ProcessingStatus';
 import ResultsView from '../components/ResultsView';
 import ApiKeyConfig from '../components/ApiKeyConfig';
+import ColumnSelector from './components/ColumnSelector';
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {
-  const { uploadedFile, results, processingProgress, apiConfig } = useProcessing();
+  const { uploadedFile, results, processingProgress, apiConfig, fileColumns } = useProcessing();
   
   return (
     <div className="space-y-6">

@@ -1,4 +1,5 @@
-import { ApiResponse, ProcessedResult, UploadedFile } from "../types";
+
+import { ApiResponse, ProcessedResult, UploadedFile, ColumnInfo } from "../types";
 import * as XLSX from 'xlsx';
 
 // Default API endpoint for the mock service
@@ -8,6 +9,7 @@ const DEFAULT_API_URL = "https://api.example.com";
 let mockFileId = "mock-file-id";
 let processingTimer: ReturnType<typeof setTimeout>;
 let userUploadedResponses: string[] = [];
+let userSelectedColumns: ColumnInfo[] = [];
 
 const mockCodeframe = [
   {
@@ -42,8 +44,61 @@ const mockCodeframe = [
   }
 ];
 
+// Store selected columns
+export const setSelectedColumns = (columns: ColumnInfo[]) => {
+  userSelectedColumns = columns;
+};
+
 // Helper function to extract real responses and randomly assign codes from the codeframe
 const generateMockCodedResponses = (responses: string[]) => {
+  // If we have selected columns, generate responses with column context
+  if (userSelectedColumns.length > 0) {
+    const result = [];
+    
+    // Use responses from each selected column
+    for (const column of userSelectedColumns) {
+      // For demonstration, we'll create mock responses for each column
+      const columnResponses = [];
+      
+      // Generate 3-5 responses per column for demonstration
+      const responseCount = Math.floor(Math.random() * 3) + 3;
+      
+      for (let i = 0; i < responseCount; i++) {
+        // Randomly assign 1-2 codes to each response
+        const numCodes = Math.floor(Math.random() * 2) + 1;
+        const allCodes = mockCodeframe.map(item => item.code);
+        const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
+        const codesAssigned = shuffledCodes.slice(0, numCodes);
+        
+        // Create a fake response or use an example if available
+        let responseText = column.examples[i % column.examples.length];
+        if (!responseText) {
+          const responses = [
+            "This is really helpful and easy to use.",
+            "I found the product to be a bit slow at times.",
+            "The features are comprehensive but the price is high.",
+            "Customer support was responsive when I had questions.",
+            "Very intuitive interface overall.",
+            "Worth the money for what you get."
+          ];
+          responseText = responses[Math.floor(Math.random() * responses.length)];
+        }
+        
+        columnResponses.push({
+          responseText,
+          columnName: column.name,
+          columnIndex: column.index,
+          codesAssigned
+        });
+      }
+      
+      result.push(...columnResponses);
+    }
+    
+    return result;
+  }
+  
+  // Fall back to the old way if no columns selected
   return responses.map(responseText => {
     // Randomly assign 1-2 codes to each response
     const numCodes = Math.floor(Math.random() * 2) + 1;
@@ -178,35 +233,33 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       : [
           {
             responseText: "The interface is so intuitive, I was able to figure it out without reading any instructions.",
-            codesAssigned: ["C01"]
+            codesAssigned: ["C01"],
+            columnName: "Overall Comments",
+            columnIndex: 0
           },
           {
             responseText: "Sometimes it runs slowly when processing large files, but overall it's been reliable.",
-            codesAssigned: ["C02"]
+            codesAssigned: ["C02"],
+            columnName: "Performance Feedback",
+            columnIndex: 1
           },
           {
             responseText: "I love the export to Excel feature, it saves me hours every week. Well worth the price!",
-            codesAssigned: ["C03", "C04"]
+            codesAssigned: ["C03", "C04"],
+            columnName: "Feature Comments",
+            columnIndex: 2
           },
           {
             responseText: "Customer support responded within minutes when I had a question. The dashboard is also great.",
-            codesAssigned: ["C05", "C03"]
+            codesAssigned: ["C05", "C03"],
+            columnName: "Support Experience",
+            columnIndex: 3
           },
           {
             responseText: "Very easy to use and the price is reasonable for what you get.",
-            codesAssigned: ["C01", "C04"]
-          },
-          {
-            responseText: "The documentation is excellent and the interface is straightforward.",
-            codesAssigned: ["C05", "C01"]
-          },
-          {
-            responseText: "No lag time even with large datasets. The filtering options are impressive.",
-            codesAssigned: ["C02", "C03"]
-          },
-          {
-            responseText: "Worth every penny for the time it saves me. Support team is also very knowledgeable.",
-            codesAssigned: ["C04", "C05"]
+            codesAssigned: ["C01", "C04"],
+            columnName: "Value Assessment",
+            columnIndex: 4
           }
         ];
     
@@ -246,10 +299,35 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
     // Create the Coded Responses worksheet
     const responsesData = result.codedResponses.map(response => ({
       Response: response.responseText,
+      Column: response.columnName || 'Unknown',
       Codes: response.codesAssigned.join('; ')
     }));
     const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
     XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
+    
+    // Create column-specific worksheets if we have column information
+    const columnResponses = new Map<string, any[]>();
+    
+    // Group responses by column
+    result.codedResponses.forEach(response => {
+      if (response.columnName) {
+        const key = response.columnName;
+        if (!columnResponses.has(key)) {
+          columnResponses.set(key, []);
+        }
+        columnResponses.get(key)?.push({
+          Response: response.responseText,
+          Codes: response.codesAssigned.join('; ')
+        });
+      }
+    });
+    
+    // Create a worksheet for each column
+    columnResponses.forEach((responses, columnName) => {
+      const safeSheetName = columnName.substring(0, 30).replace(/[*?[\]]/g, '_'); // Ensure valid worksheet name
+      const worksheet = XLSX.utils.json_to_sheet(responses);
+      XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
+    });
     
     // Write the workbook to an array buffer instead of binary string
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });

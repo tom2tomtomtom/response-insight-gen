@@ -1,17 +1,47 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { Loader2, Download, RefreshCw } from 'lucide-react';
+import { Loader2, Download, RefreshCw, Filter } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Input } from './ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ColumnInfo } from '../types';
 
 const ResultsView: React.FC = () => {
-  const { results, isGeneratingExcel, downloadResults, resetState } = useProcessing();
+  const { results, isGeneratingExcel, downloadResults, resetState, fileColumns } = useProcessing();
+  const [searchFilter, setSearchFilter] = useState('');
+  const [columnFilter, setColumnFilter] = useState<string>('all');
   
   if (!results) {
     return null;
   }
+
+  // Get available columns from the results
+  const availableColumns = [...new Set(
+    results.codedResponses
+      .filter(r => r.columnName)
+      .map(r => ({
+        name: r.columnName || 'Unknown',
+        index: r.columnIndex !== undefined ? r.columnIndex : -1
+      }))
+  )];
+  
+  // Apply filters to the coded responses
+  const filteredResponses = results.codedResponses.filter(response => {
+    // Apply text search filter
+    const matchesSearch = !searchFilter || 
+      response.responseText.toLowerCase().includes(searchFilter.toLowerCase());
+    
+    // Apply column filter
+    const matchesColumn = columnFilter === 'all' || 
+      (response.columnIndex !== undefined && 
+       response.columnIndex.toString() === columnFilter);
+    
+    return matchesSearch && matchesColumn;
+  });
   
   return (
     <Card className="w-full">
@@ -62,18 +92,59 @@ const ResultsView: React.FC = () => {
           </TabsContent>
           
           <TabsContent value="responses" className="mt-4">
+            <div className="flex flex-col md:flex-row gap-4 mb-4 items-end">
+              <div className="flex-1">
+                <label className="text-sm text-muted-foreground mb-2 block">Search responses</label>
+                <Input
+                  placeholder="Search by response text..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                />
+              </div>
+              
+              <div className="w-full md:w-48">
+                <label className="text-sm text-muted-foreground mb-2 block">Filter by column</label>
+                <Select 
+                  value={columnFilter}
+                  onValueChange={setColumnFilter}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All columns" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All columns</SelectItem>
+                    {availableColumns.map(column => (
+                      <SelectItem key={column.index} value={column.index.toString()}>
+                        {column.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Badge variant="secondary">
+                  {filteredResponses.length} responses
+                </Badge>
+              </div>
+            </div>
+            
             <div className="overflow-x-auto">
               <table className="excel-table">
                 <thead>
                   <tr>
                     <th>Response</th>
+                    <th>Column</th>
                     <th>Assigned Codes</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {results.codedResponses.map((response, index) => (
+                  {filteredResponses.map((response, index) => (
                     <tr key={index}>
                       <td>{response.responseText}</td>
+                      <td>
+                        {response.columnName || 'Unknown'}
+                      </td>
                       <td>
                         <div className="flex flex-wrap gap-1">
                           {response.codesAssigned.map(code => (
@@ -90,6 +161,12 @@ const ResultsView: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              
+              {filteredResponses.length === 0 && (
+                <div className="py-8 text-center text-muted-foreground">
+                  No responses match your filters
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
