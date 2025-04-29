@@ -4,6 +4,7 @@ import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry } from '..
 import { toast } from '../components/ui/use-toast';
 import { uploadFile, processFile, getProcessingResult, generateExcelFile } from '../services/api';
 import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 
 interface ProcessingContextType {
   uploadedFile: UploadedFile | null;
@@ -95,14 +96,73 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
+  // Parse CSV file and extract responses
+  const parseCSVFile = async (file: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          try {
+            if (results.data && results.data.length > 0) {
+              // Try to find response column - look for common names
+              const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text'];
+              const firstRow = results.data[0] as Record<string, any>;
+              const headers = Object.keys(firstRow);
+              
+              let responseColumn = '';
+              
+              // Try to find a column that matches our expected response column names
+              for (const column of headers) {
+                if (possibleColumns.includes(column.toLowerCase())) {
+                  responseColumn = column;
+                  break;
+                }
+              }
+              
+              // If no match found, use the first column
+              if (!responseColumn && headers.length > 0) {
+                responseColumn = headers[0];
+              }
+              
+              if (responseColumn) {
+                const responses = results.data
+                  .map((row: any) => row[responseColumn])
+                  .filter((response: any) => typeof response === 'string' && response.trim() !== '');
+                
+                resolve(responses);
+              } else {
+                reject(new Error('Could not find a suitable response column'));
+              }
+            } else {
+              reject(new Error('No data found in the CSV file'));
+            }
+          } catch (error) {
+            reject(error);
+          }
+        },
+        error: (error) => {
+          reject(new Error(`Error parsing CSV: ${error.message}`));
+        }
+      });
+    });
+  };
+
   // Handle file upload
   const handleFileUpload = async (file: File) => {
     try {
       setIsUploading(true);
       setProcessingStatus('Parsing file...');
       
-      // Parse the Excel file to get responses
-      const responses = await parseExcelFile(file);
+      let responses: string[] = [];
+      
+      // Parse file based on type
+      if (file.name.endsWith('.csv')) {
+        responses = await parseCSVFile(file);
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        responses = await parseExcelFile(file);
+      } else {
+        throw new Error('Unsupported file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+      }
       
       if (responses.length === 0) {
         throw new Error('No valid responses found in the file');

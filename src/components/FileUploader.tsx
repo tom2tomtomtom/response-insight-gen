@@ -46,7 +46,7 @@ const FileUploader: React.FC = () => {
       <CardHeader>
         <CardTitle>Upload Survey Responses</CardTitle>
         <CardDescription>
-          Drag and drop your Excel file or click to browse
+          Drag and drop your Excel or CSV file or click to browse
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -63,7 +63,7 @@ const FileUploader: React.FC = () => {
           <input 
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv"
             className="hidden"
             onChange={handleFileChange}
             disabled={isUploading}
@@ -82,7 +82,7 @@ const FileUploader: React.FC = () => {
             ) : (
               <>
                 <p className="font-medium">
-                  Upload an Excel file containing your survey responses
+                  Upload an Excel or CSV file containing your survey responses
                 </p>
                 <p className="text-sm text-muted-foreground">
                   File should include a column with open-ended responses
@@ -94,7 +94,7 @@ const FileUploader: React.FC = () => {
       </CardContent>
       <CardFooter className="flex justify-center">
         <p className="text-xs text-muted-foreground">
-          Supported formats: .xlsx, .xls
+          Supported formats: .xlsx, .xls, .csv
         </p>
       </CardFooter>
     </Card>
