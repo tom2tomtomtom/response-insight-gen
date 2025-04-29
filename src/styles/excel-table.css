@@ -1,0 +1,26 @@
+
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.excel-table th,
+.excel-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+}
+
+.excel-table th {
+  background-color: #f8fafc;
+  font-weight: 600;
+}
+
+.excel-table tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.excel-table tr:hover {
+  background-color: #f1f5f9;
+}

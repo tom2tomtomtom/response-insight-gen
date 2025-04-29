@@ -5,20 +5,8 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Loader2, Play } from 'lucide-react';
 
-// Mock data for preview
-const mockResponseData = [
-  { id: 1, response: "The product is very easy to use and intuitive. I didn't need any training." },
-  { id: 2, response: "Customer support was excellent when I had questions." },
-  { id: 3, response: "The price point is fair for the features offered." },
-  { id: 4, response: "I wish it had better integration with other tools we use." },
-  { id: 5, response: "Performance has been excellent even with large datasets." },
-  { id: 6, response: "The export functionality saves me hours of work every week." },
-  { id: 7, response: "The interface could be more modern, but it's functional." },
-  { id: 8, response: "Very reliable, hasn't crashed once in six months of use." }
-];
-
 const FilePreview: React.FC = () => {
-  const { uploadedFile, isProcessing, startProcessing } = useProcessing();
+  const { uploadedFile, isProcessing, startProcessing, rawResponses } = useProcessing();
   
   if (!uploadedFile) {
     return null;
@@ -41,17 +29,17 @@ const FilePreview: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {mockResponseData.map(row => (
-                <tr key={row.id}>
-                  <td>{row.id}</td>
-                  <td>{row.response}</td>
+              {rawResponses.slice(0, 8).map((response, index) => (
+                <tr key={index}>
+                  <td>{index + 1}</td>
+                  <td>{response}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           
           <p className="text-muted-foreground text-sm mt-4">
-            Displaying 8 of {Math.floor(Math.random() * 50) + 20} responses
+            Displaying {Math.min(8, rawResponses.length)} of {rawResponses.length} responses
           </p>
         </div>
       </CardContent>

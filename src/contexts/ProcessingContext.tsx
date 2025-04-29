@@ -1,8 +1,9 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProcessedResult, UploadedFile } from '../types';
+import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { uploadFile, processFile, getProcessingResult, generateExcelFile } from '../services/api';
+import * as XLSX from 'xlsx';
 
 interface ProcessingContextType {
   uploadedFile: UploadedFile | null;
@@ -12,6 +13,7 @@ interface ProcessingContextType {
   processingProgress: number;
   results: ProcessedResult | null;
   isGeneratingExcel: boolean;
+  rawResponses: string[];
   handleFileUpload: (file: File) => Promise<void>;
   startProcessing: () => Promise<void>;
   downloadResults: () => Promise<void>;
@@ -28,11 +30,87 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [processingProgress, setProcessingProgress] = useState(0);
   const [results, setResults] = useState<ProcessedResult | null>(null);
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
+  const [rawResponses, setRawResponses] = useState<string[]>([]);
+
+  // Parse Excel file and extract responses
+  const parseExcelFile = async (file: File): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Get the first sheet
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convert to JSON
+          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+          
+          // Try to find response column - look for common names
+          const possibleColumns = ['response', 'responses', 'verbatim', 'comment', 'feedback', 'answer', 'text'];
+          let responseColumn = '';
+          
+          if (jsonData.length > 0) {
+            const firstRow = jsonData[0];
+            const headers = Object.keys(firstRow);
+            
+            // Try to find a column that matches our expected response column names
+            for (const column of headers) {
+              if (possibleColumns.includes(column.toLowerCase())) {
+                responseColumn = column;
+                break;
+              }
+            }
+            
+            // If no match found, use the first text column
+            if (!responseColumn && headers.length > 0) {
+              responseColumn = headers[0];
+            }
+            
+            if (responseColumn) {
+              const responses = jsonData
+                .map(row => row[responseColumn])
+                .filter(response => typeof response === 'string' && response.trim() !== '');
+              
+              resolve(responses);
+            } else {
+              reject(new Error('Could not find a suitable response column'));
+            }
+          } else {
+            reject(new Error('No data found in the Excel file'));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Error reading file'));
+      };
+      
+      reader.readAsArrayBuffer(file);
+    });
+  };
 
   // Handle file upload
   const handleFileUpload = async (file: File) => {
     try {
       setIsUploading(true);
+      setProcessingStatus('Parsing file...');
+      
+      // Parse the Excel file to get responses
+      const responses = await parseExcelFile(file);
+      
+      if (responses.length === 0) {
+        throw new Error('No valid responses found in the file');
+      }
+      
+      setRawResponses(responses);
+      
+      // Continue with the upload process
       setProcessingStatus('Uploading file...');
       
       const response = await uploadFile(file);
@@ -44,7 +122,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       setUploadedFile(response.data);
       toast({
         title: "File Uploaded",
-        description: `Successfully uploaded ${file.name}`,
+        description: `Successfully uploaded ${file.name} with ${responses.length} responses`,
       });
     } catch (error) {
       toast({
@@ -52,6 +130,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         title: "Upload Failed",
         description: error instanceof Error ? error.message : "An error occurred during upload",
       });
+      resetState();
     } finally {
       setIsUploading(false);
     }
@@ -191,6 +270,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setProcessingProgress(0);
     setResults(null);
     setIsGeneratingExcel(false);
+    setRawResponses([]);
   };
 
   const value = {
@@ -201,6 +281,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     processingProgress,
     results,
     isGeneratingExcel,
+    rawResponses,
     handleFileUpload,
     startProcessing,
     downloadResults,

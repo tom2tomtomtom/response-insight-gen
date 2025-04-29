@@ -7,6 +7,7 @@ const API_BASE_URL = "https://api.example.com";
 // Mock data for demonstration purposes
 let mockFileId = "mock-file-id";
 let processingTimer: ReturnType<typeof setTimeout>;
+let userUploadedResponses: string[] = [];
 
 const mockCodeframe = [
   {
@@ -41,40 +42,21 @@ const mockCodeframe = [
   }
 ];
 
-const mockResponses = [
-  {
-    responseText: "The interface is so intuitive, I was able to figure it out without reading any instructions.",
-    codesAssigned: ["C01"]
-  },
-  {
-    responseText: "Sometimes it runs slowly when processing large files, but overall it's been reliable.",
-    codesAssigned: ["C02"]
-  },
-  {
-    responseText: "I love the export to Excel feature, it saves me hours every week. Well worth the price!",
-    codesAssigned: ["C03", "C04"]
-  },
-  {
-    responseText: "Customer support responded within minutes when I had a question. The dashboard is also great.",
-    codesAssigned: ["C05", "C03"]
-  },
-  {
-    responseText: "Very easy to use and the price is reasonable for what you get.",
-    codesAssigned: ["C01", "C04"]
-  },
-  {
-    responseText: "The documentation is excellent and the interface is straightforward.",
-    codesAssigned: ["C05", "C01"]
-  },
-  {
-    responseText: "No lag time even with large datasets. The filtering options are impressive.",
-    codesAssigned: ["C02", "C03"]
-  },
-  {
-    responseText: "Worth every penny for the time it saves me. Support team is also very knowledgeable.",
-    codesAssigned: ["C04", "C05"]
-  }
-];
+// Helper function to extract real responses and randomly assign codes from the codeframe
+const generateMockCodedResponses = (responses: string[]) => {
+  return responses.map(responseText => {
+    // Randomly assign 1-2 codes to each response
+    const numCodes = Math.floor(Math.random() * 2) + 1;
+    const allCodes = mockCodeframe.map(item => item.code);
+    const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
+    const codesAssigned = shuffledCodes.slice(0, numCodes);
+    
+    return {
+      responseText,
+      codesAssigned
+    };
+  });
+};
 
 // Upload file to server
 export const uploadFile = async (file: File): Promise<ApiResponse<UploadedFile>> => {
@@ -127,18 +109,61 @@ export const processFile = async (fileId: string): Promise<ApiResponse<UploadedF
   }
 };
 
+// Store the real responses for use in the API
+export const setUserResponses = (responses: string[]) => {
+  userUploadedResponses = responses;
+};
+
 // Get the processing status and results
 export const getProcessingResult = async (fileId: string): Promise<ApiResponse<ProcessedResult>> => {
   try {
     // Simulate processing delay (in a real app, this would check the actual status)
     await new Promise(resolve => setTimeout(resolve, 2000));
     
+    // Use real uploaded responses if available
+    const codedResponses = userUploadedResponses.length > 0
+      ? generateMockCodedResponses(userUploadedResponses)
+      : [
+          {
+            responseText: "The interface is so intuitive, I was able to figure it out without reading any instructions.",
+            codesAssigned: ["C01"]
+          },
+          {
+            responseText: "Sometimes it runs slowly when processing large files, but overall it's been reliable.",
+            codesAssigned: ["C02"]
+          },
+          {
+            responseText: "I love the export to Excel feature, it saves me hours every week. Well worth the price!",
+            codesAssigned: ["C03", "C04"]
+          },
+          {
+            responseText: "Customer support responded within minutes when I had a question. The dashboard is also great.",
+            codesAssigned: ["C05", "C03"]
+          },
+          {
+            responseText: "Very easy to use and the price is reasonable for what you get.",
+            codesAssigned: ["C01", "C04"]
+          },
+          {
+            responseText: "The documentation is excellent and the interface is straightforward.",
+            codesAssigned: ["C05", "C01"]
+          },
+          {
+            responseText: "No lag time even with large datasets. The filtering options are impressive.",
+            codesAssigned: ["C02", "C03"]
+          },
+          {
+            responseText: "Worth every penny for the time it saves me. Support team is also very knowledgeable.",
+            codesAssigned: ["C04", "C05"]
+          }
+        ];
+    
     // Return mock results
     return {
       success: true,
       data: {
         codeframe: mockCodeframe,
-        codedResponses: mockResponses,
+        codedResponses: codedResponses,
         status: 'complete'
       }
     };
