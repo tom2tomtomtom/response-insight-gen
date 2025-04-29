@@ -10,7 +10,7 @@ import FilePreview from '../components/FilePreview';
 import ProcessingStatus from '../components/ProcessingStatus';
 import ResultsView from '../components/ResultsView';
 import ApiKeyConfig from '../components/ApiKeyConfig';
-import ColumnSelector from './components/ColumnSelector';
+import ColumnSelector from '../components/ColumnSelector'; // Fix the import path
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo } from '../types';
 import { toast } from '../components/ui/use-toast';
@@ -510,7 +509,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         });
       } else {
         toast({
-          variant: "warning",
+          variant: "destructive",
           title: "File Uploaded",
           description: "No text columns were automatically detected. Please manually select columns with text responses.",
         });
@@ -553,7 +552,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       setProcessingProgress(10);
       
       // Send selected columns to API
-      setSelectedColumns(fileColumns.filter(col => selectedColumns.includes(col.index)));
+      setSelectedColumns(selectedColumns); // Only send the array of indices
       
       const response = await processFile(uploadedFile.id, apiConfig || undefined);
       
