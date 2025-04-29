@@ -251,18 +251,13 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
     const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
     XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
     
-    // Generate the Excel file as a binary string
-    const excelBinary = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
+    // Write the workbook to an array buffer instead of binary string
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     
-    // Convert binary string to ArrayBuffer
-    const buffer = new ArrayBuffer(excelBinary.length);
-    const view = new Uint8Array(buffer);
-    for (let i = 0; i < excelBinary.length; i++) {
-      view[i] = excelBinary.charCodeAt(i) & 0xFF;
-    }
-    
-    // Create a Blob from the ArrayBuffer
-    return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    // Create a Blob from the ArrayBuffer with the correct MIME type
+    return new Blob([excelBuffer], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
   } catch (error) {
     console.error("Error generating Excel file:", error);
     throw new Error('Failed to generate Excel file');
