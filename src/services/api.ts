@@ -1,5 +1,5 @@
-
 import { ApiResponse, ProcessedResult, UploadedFile } from "../types";
+import * as XLSX from 'xlsx';
 
 // In a real-world scenario, this would point to your actual API endpoint
 const API_BASE_URL = "https://api.example.com";
@@ -177,14 +177,42 @@ export const getProcessingResult = async (fileId: string): Promise<ApiResponse<P
 
 // Function to generate an Excel file from the results
 export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> => {
-  // In a real implementation, this would call an API endpoint that returns a Blob
   try {
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
     
-    // This is just a placeholder - in a real app, the API would return an actual Excel file
-    return new Blob(['Excel file content'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    // Create the Codeframe worksheet
+    const codeframeData = result.codeframe.map(code => ({
+      Code: code.code,
+      Label: code.label,
+      Definition: code.definition,
+      Examples: code.examples.join('; ')
+    }));
+    const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
+    XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, "Codeframe");
+    
+    // Create the Coded Responses worksheet
+    const responsesData = result.codedResponses.map(response => ({
+      Response: response.responseText,
+      Codes: response.codesAssigned.join('; ')
+    }));
+    const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
+    XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
+    
+    // Generate the Excel file as a binary string
+    const excelBinary = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
+    
+    // Convert binary string to ArrayBuffer
+    const buffer = new ArrayBuffer(excelBinary.length);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < excelBinary.length; i++) {
+      view[i] = excelBinary.charCodeAt(i) & 0xFF;
+    }
+    
+    // Create a Blob from the ArrayBuffer
+    return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   } catch (error) {
+    console.error("Error generating Excel file:", error);
     throw new Error('Failed to generate Excel file');
   }
 };
