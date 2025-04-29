@@ -1,8 +1,8 @@
 import { ApiResponse, ProcessedResult, UploadedFile } from "../types";
 import * as XLSX from 'xlsx';
 
-// In a real-world scenario, this would point to your actual API endpoint
-const API_BASE_URL = "https://api.example.com";
+// Default API endpoint for the mock service
+const DEFAULT_API_URL = "https://api.example.com";
 
 // Mock data for demonstration purposes
 let mockFileId = "mock-file-id";
@@ -58,12 +58,45 @@ const generateMockCodedResponses = (responses: string[]) => {
   });
 };
 
+// Test API connection with provided key
+export const testApiConnection = async (apiKey: string, apiUrl: string): Promise<boolean> => {
+  try {
+    // In a real implementation, this would check if the API key is valid
+    // Here, we'll just simulate a check
+    
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // For now, we'll assume any non-empty key is valid
+    if (!apiKey.trim()) {
+      throw new Error("API key is required");
+    }
+    
+    // Return success
+    return true;
+  } catch (error) {
+    console.error("API connection test failed:", error);
+    throw error;
+  }
+};
+
 // Upload file to server
-export const uploadFile = async (file: File): Promise<ApiResponse<UploadedFile>> => {
+export const uploadFile = async (file: File, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<UploadedFile>> => {
   // In a real implementation, this would be a fetch call to your API
   try {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // If we have API config, we'd use it here to make a real API call
+    if (apiConfig?.apiKey) {
+      console.log(`Using API key ${apiConfig.apiKey.substring(0, 3)}... to upload to ${apiConfig.apiUrl || DEFAULT_API_URL}`);
+      // In a real implementation:
+      // return await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/upload`, {
+      //   method: 'POST',
+      //   headers: { 'Authorization': `Bearer ${apiConfig.apiKey}` },
+      //   body: formData
+      // }).then(res => res.json());
+    }
     
     // Simulate API response
     return {
@@ -84,10 +117,20 @@ export const uploadFile = async (file: File): Promise<ApiResponse<UploadedFile>>
 };
 
 // Process the uploaded file
-export const processFile = async (fileId: string): Promise<ApiResponse<UploadedFile>> => {
+export const processFile = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<UploadedFile>> => {
   try {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // If we have API config, we'd use it here to make a real API call
+    if (apiConfig?.apiKey) {
+      console.log(`Using API key ${apiConfig.apiKey.substring(0, 3)}... to process file at ${apiConfig.apiUrl || DEFAULT_API_URL}`);
+      // In a real implementation:
+      // return await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/process/${fileId}`, {
+      //   method: 'POST',
+      //   headers: { 'Authorization': `Bearer ${apiConfig.apiKey}` }
+      // }).then(res => res.json());
+    }
     
     // Start mock processing timer
     clearTimeout(processingTimer);
@@ -115,10 +158,19 @@ export const setUserResponses = (responses: string[]) => {
 };
 
 // Get the processing status and results
-export const getProcessingResult = async (fileId: string): Promise<ApiResponse<ProcessedResult>> => {
+export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
     // Simulate processing delay (in a real app, this would check the actual status)
     await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // If we have API config, we'd use it here to make a real API call
+    if (apiConfig?.apiKey) {
+      console.log(`Using API key ${apiConfig.apiKey.substring(0, 3)}... to get results from ${apiConfig.apiUrl || DEFAULT_API_URL}`);
+      // In a real implementation:
+      // return await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/results/${fileId}`, {
+      //   headers: { 'Authorization': `Bearer ${apiConfig.apiKey}` }
+      // }).then(res => res.json());
+    }
     
     // Use real uploaded responses if available
     const codedResponses = userUploadedResponses.length > 0

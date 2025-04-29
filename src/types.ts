@@ -30,3 +30,9 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
 }
+
+export interface ApiConfig {
+  apiKey: string;
+  apiUrl: string;
+  isConfigured: boolean;
+}

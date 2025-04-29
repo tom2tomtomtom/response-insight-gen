@@ -9,13 +9,18 @@ import FileUploader from '../components/FileUploader';
 import FilePreview from '../components/FilePreview';
 import ProcessingStatus from '../components/ProcessingStatus';
 import ResultsView from '../components/ResultsView';
+import ApiKeyConfig from '../components/ApiKeyConfig';
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {
-  const { uploadedFile, results, processingProgress } = useProcessing();
+  const { uploadedFile, results, processingProgress, apiConfig } = useProcessing();
   
   return (
     <div className="space-y-6">
+      {!uploadedFile && !apiConfig?.isConfigured && (
+        <ApiKeyConfig />
+      )}
+      
       {!uploadedFile && <IntroCard />}
       
       <WorkflowSteps />

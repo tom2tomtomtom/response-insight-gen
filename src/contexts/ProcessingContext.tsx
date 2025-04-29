@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry } from '../types';
+import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig } from '../types';
 import { toast } from '../components/ui/use-toast';
-import { uploadFile, processFile, getProcessingResult, generateExcelFile } from '../services/api';
+import { 
+  uploadFile, 
+  processFile, 
+  getProcessingResult, 
+  generateExcelFile, 
+  testApiConnection, 
+  setUserResponses 
+} from '../services/api';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
@@ -14,6 +21,9 @@ interface ProcessingContextType {
   results: ProcessedResult | null;
   isGeneratingExcel: boolean;
   rawResponses: string[];
+  apiConfig: ApiConfig | null;
+  setApiConfig: (config: ApiConfig) => void;
+  testApiConnection: (apiKey: string, apiUrl: string) => Promise<boolean>;
   handleFileUpload: (file: File) => Promise<void>;
   startProcessing: () => Promise<void>;
   downloadResults: () => Promise<void>;
@@ -31,6 +41,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [results, setResults] = useState<ProcessedResult | null>(null);
   const [isGeneratingExcel, setIsGeneratingExcel] = useState(false);
   const [rawResponses, setRawResponses] = useState<string[]>([]);
+  const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
 
   // Parse Excel file and extract responses
   const parseExcelFile = async (file: File): Promise<string[]> => {
@@ -197,6 +208,25 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
+  // Test API connection
+  const handleTestApiConnection = async (apiKey: string, apiUrl: string): Promise<boolean> => {
+    try {
+      await testApiConnection(apiKey, apiUrl);
+      toast({
+        title: "API Connection Successful",
+        description: "Your API key has been verified and is working correctly.",
+      });
+      return true;
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "API Connection Failed",
+        description: error instanceof Error ? error.message : "Could not verify API key",
+      });
+      return false;
+    }
+  };
+
   // Handle file upload
   const handleFileUpload = async (file: File) => {
     try {
@@ -223,11 +253,12 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       }
       
       setRawResponses(responses);
+      setUserResponses(responses);
       
       // Continue with the upload process
       setProcessingStatus('Uploading file...');
       
-      const response = await uploadFile(file);
+      const response = await uploadFile(file, apiConfig || undefined);
       
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Upload failed');
@@ -266,7 +297,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       setProcessingStatus('Starting analysis...');
       setProcessingProgress(10);
       
-      const response = await processFile(uploadedFile.id);
+      const response = await processFile(uploadedFile.id, apiConfig || undefined);
       
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Processing failed to start');
@@ -308,7 +339,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Get the actual results
-      const response = await getProcessingResult(fileId);
+      const response = await getProcessingResult(fileId, apiConfig || undefined);
       
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to retrieve results');
@@ -385,6 +416,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setResults(null);
     setIsGeneratingExcel(false);
     setRawResponses([]);
+    // Note: We don't reset the API config on purpose
   };
 
   const value = {
@@ -396,6 +428,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     results,
     isGeneratingExcel,
     rawResponses,
+    apiConfig,
+    setApiConfig,
+    testApiConnection: handleTestApiConnection,
     handleFileUpload,
     startProcessing,
     downloadResults,
