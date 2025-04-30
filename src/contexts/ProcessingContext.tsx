@@ -548,7 +548,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         fileColumns.find(col => col.index === index)
       ).filter(Boolean) as ColumnInfo[];
       
-      // Send selected columns to API service, not to the state setter
+      // Send selected columns to API service - fixed by calling the service function directly
       setSelectedColumns(selectedColumnsInfo);
       
       const response = await processFile(uploadedFile.id, apiConfig || undefined);
