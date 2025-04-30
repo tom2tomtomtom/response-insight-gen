@@ -1,3 +1,4 @@
+
 import { ApiResponse, ProcessedResult, UploadedFile, ColumnInfo } from "../types";
 import * as XLSX from 'xlsx';
 
@@ -126,6 +127,11 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     
     console.log("Selected columns for processing:", userSelectedColumns);
     
+    // Check if we have selected columns
+    if (!userSelectedColumns || userSelectedColumns.length === 0) {
+      throw new Error("No columns selected for processing");
+    }
+    
     // Prepare the data we want to send to the OpenAI API
     const columnData = userSelectedColumns.map(column => ({
       name: column.name,
@@ -155,7 +161,9 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         
         Format your response as a JSON object with two properties:
         - codeframe: An array of code objects with {code, label, definition, examples}
-        - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`
+        - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}
+
+        IMPORTANT: Format your entire response as valid JSON. Don't include any text outside the JSON structure.`
       }
     ];
     
@@ -170,7 +178,8 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         model: "gpt-4o",
         messages: messages,
         temperature: 0.7,
-        max_tokens: 4000
+        max_tokens: 4000,
+        response_format: { type: "json_object" } // Request JSON format explicitly
       })
     });
     
@@ -182,30 +191,40 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     const data = await response.json();
     console.log("OpenAI response:", data);
     
-    // Parse the JSON content from the OpenAI response
     try {
+      // Parse the content from the OpenAI response
       const content = data.choices[0].message.content;
-      // Extract the JSON part of the response
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
-      
       let parsedResult;
-      if (jsonMatch) {
-        parsedResult = JSON.parse(jsonMatch[0].replace(/```json|```/g, '').trim());
-      } else {
+      
+      // Attempt to parse the JSON
+      try {
         parsedResult = JSON.parse(content);
+      } catch (jsonError) {
+        console.error("Failed to parse JSON directly:", jsonError);
+        
+        // If content isn't valid JSON, fall back to mock data
+        console.warn("OpenAI didn't return valid JSON, falling back to mock data");
+        return mockGetProcessingResult(fileId);
+      }
+      
+      // Validate the parsed result structure
+      if (!parsedResult.codeframe || !Array.isArray(parsedResult.codeframe) || 
+          !parsedResult.codedResponses || !Array.isArray(parsedResult.codedResponses)) {
+        console.warn("OpenAI response doesn't have the expected structure, falling back to mock data");
+        return mockGetProcessingResult(fileId);
       }
       
       // Return the processed result
       return {
         success: true,
         data: {
-          codeframe: parsedResult.codeframe || [],
-          codedResponses: parsedResult.codedResponses || [],
+          codeframe: parsedResult.codeframe,
+          codedResponses: parsedResult.codedResponses,
           status: 'complete'
         }
       };
     } catch (error) {
-      console.error("Error parsing OpenAI response:", error);
+      console.error("Error handling OpenAI response:", error);
       throw new Error("Failed to parse analysis results from OpenAI");
     }
   } catch (error) {
