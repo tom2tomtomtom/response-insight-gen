@@ -6,9 +6,8 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Search, Play, FileText, FileSpreadsheet } from 'lucide-react';
+import { Search, Play, FileText } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
-import { ColumnInfo } from '../types';
 
 const ColumnSelector: React.FC = () => {
   const { 
@@ -25,12 +24,17 @@ const ColumnSelector: React.FC = () => {
     return null;
   }
   
-  const filteredColumns = fileColumns.filter(
+  // Only display text and mixed columns, filter out numeric columns
+  const displayColumns = fileColumns.filter(
+    col => col.type === 'text' || col.type === 'mixed'
+  );
+  
+  const filteredColumns = displayColumns.filter(
     col => col.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
   const selectedCount = selectedColumns.length;
-  const textColumnCount = fileColumns.filter(col => col.type === 'text').length;
+  const textColumnCount = displayColumns.length;
   
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -46,7 +50,7 @@ const ColumnSelector: React.FC = () => {
           </Badge>
         </CardTitle>
         <CardDescription>
-          We've identified {textColumnCount} potential text response columns. 
+          We've identified {textColumnCount} text response columns. 
           Select which columns to analyze.
         </CardDescription>
         <div className="relative mt-2">
@@ -91,11 +95,6 @@ const ColumnSelector: React.FC = () => {
                       {column.type === 'mixed' && (
                         <Badge variant="outline" className="text-xs">
                           Mixed
-                        </Badge>
-                      )}
-                      {column.type === 'numeric' && (
-                        <Badge variant="outline" className="text-xs bg-gray-100">
-                          Numeric
                         </Badge>
                       )}
                     </div>

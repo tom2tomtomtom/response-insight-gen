@@ -276,7 +276,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
             }
           });
           
-          // Auto-select text columns
+          // Auto-select ONLY text columns, not numeric or mixed
           const autoSelectedColumns = columnInfos
             .filter(col => col.type === 'text')
             .map(col => col.index);
@@ -406,7 +406,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
               }
             });
             
-            // Auto-select text columns
+            // Auto-select ONLY text columns, not numeric or mixed
             const autoSelectedColumns = columnInfos
               .filter(col => col.type === 'text')
               .map(col => col.index);
