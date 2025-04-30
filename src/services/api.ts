@@ -1,9 +1,8 @@
-
 import { ApiResponse, ProcessedResult, UploadedFile, ColumnInfo } from "../types";
 import * as XLSX from 'xlsx';
 
 // Default API endpoint for the text analysis service
-const DEFAULT_API_URL = "https://api.textanalysis.com/v1";
+const DEFAULT_API_URL = "https://api.openai.com/v1/chat/completions";
 
 // Store selected columns for processing
 let userSelectedColumns: ColumnInfo[] = [];
@@ -16,13 +15,18 @@ export const setSelectedColumns = (columns: ColumnInfo[]) => {
 // Test API connection with provided key
 export const testApiConnection = async (apiKey: string, apiUrl: string): Promise<boolean> => {
   try {
-    // Make a real API call to test the connection
-    const response = await fetch(`${apiUrl || DEFAULT_API_URL}/test`, {
-      method: 'GET',
+    // Make a minimal request to test the connection
+    const response = await fetch(`${apiUrl || DEFAULT_API_URL}`, {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "Hello" }],
+        max_tokens: 5
+      })
     });
     
     if (!response.ok) {
@@ -37,38 +41,17 @@ export const testApiConnection = async (apiKey: string, apiUrl: string): Promise
   }
 };
 
-// Upload file to the analysis service
+// Handle file upload - now processes locally without sending to API
 export const uploadFile = async (file: File, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<UploadedFile>> => {
   try {
-    if (!apiConfig?.apiKey) {
-      // For demo purposes, generate a mock response if no API key is provided
-      return mockUploadFile(file);
-    }
+    // Generate a file ID locally - we don't need to upload the file to OpenAI
+    const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
     
-    // Create form data for file upload
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    // Make actual API call
-    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiConfig.apiKey}`
-      },
-      body: formData
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Upload failed with status ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
+    // Just return a successful upload response
     return {
       success: true,
       data: {
-        id: data.fileId,
+        id: fileId,
         filename: file.name,
         status: 'uploaded',
         uploadedAt: new Date()
@@ -83,20 +66,12 @@ export const uploadFile = async (file: File, apiConfig?: { apiKey: string, apiUr
   }
 };
 
-// Mock upload function for demo purposes when no API key is provided
-const mockUploadFile = async (file: File): Promise<ApiResponse<UploadedFile>> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  return {
-    success: true,
-    data: {
-      id: "demo-file-id",
-      filename: file.name,
-      status: 'uploaded',
-      uploadedAt: new Date()
-    }
-  };
+// Store user responses
+let userUploadedResponses: string[] = [];
+
+// Store the real responses for use in the API
+export const setUserResponses = (responses: string[]) => {
+  userUploadedResponses = responses;
 };
 
 // Process the uploaded file
@@ -107,34 +82,13 @@ export const processFile = async (fileId: string, apiConfig?: { apiKey: string, 
       return mockProcessFile(fileId);
     }
     
-    // Prepare the processing request with selected columns
-    const requestBody = {
-      fileId,
-      columns: userSelectedColumns
-    };
-    
-    // Make the actual API call
-    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/process`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiConfig.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Processing failed with status ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
+    // Just return a processing status without actually making an API call
+    // The actual processing will happen in getProcessingResult
     return {
       success: true,
       data: {
         id: fileId,
-        filename: data.filename || 'processed_file.xlsx',
+        filename: 'processing_file.xlsx',
         status: 'processing'
       }
     };
@@ -162,14 +116,6 @@ const mockProcessFile = async (fileId: string): Promise<ApiResponse<UploadedFile
   };
 };
 
-// Store user responses
-let userUploadedResponses: string[] = [];
-
-// Store the real responses for use in the API
-export const setUserResponses = (responses: string[]) => {
-  userUploadedResponses = responses;
-};
-
 // Get the processing result
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
@@ -178,30 +124,90 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       return mockGetProcessingResult(fileId);
     }
     
-    // Make the actual API call
-    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/results/${fileId}`, {
-      method: 'GET',
+    console.log("Selected columns for processing:", userSelectedColumns);
+    
+    // Prepare the data we want to send to the OpenAI API
+    const columnData = userSelectedColumns.map(column => ({
+      name: column.name,
+      examples: column.examples || []
+    }));
+    
+    // Create a prompt for OpenAI to analyze the data
+    const messages = [
+      {
+        role: "system",
+        content: `You are an expert qualitative researcher analyzing open-ended survey responses. 
+        Your task is to create a codeframe (a set of themes/codes) based on the survey responses provided,
+        and then code each response according to that codeframe.`
+      },
+      {
+        role: "user",
+        content: `I have a survey with the following open-ended questions:
+        ${JSON.stringify(columnData, null, 2)}
+        
+        Please analyze these responses and:
+        1. Create a codeframe with 5-8 distinct codes
+        2. For each code, provide:
+           - A short label
+           - A clear definition
+           - 2-3 example phrases
+        3. Assign appropriate codes to each response
+        
+        Format your response as a JSON object with two properties:
+        - codeframe: An array of code objects with {code, label, definition, examples}
+        - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`
+      }
+    ];
+    
+    // Make the API call to OpenAI
+    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiConfig.apiKey}`,
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 4000
+      })
     });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Getting results failed with status ${response.status}`);
+      throw new Error(errorData.message || `Processing failed with status ${response.status}`);
     }
     
     const data = await response.json();
+    console.log("OpenAI response:", data);
     
-    return {
-      success: true,
-      data: {
-        codeframe: data.codeframe,
-        codedResponses: data.codedResponses,
-        status: 'complete'
+    // Parse the JSON content from the OpenAI response
+    try {
+      const content = data.choices[0].message.content;
+      // Extract the JSON part of the response
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/\{[\s\S]*\}/);
+      
+      let parsedResult;
+      if (jsonMatch) {
+        parsedResult = JSON.parse(jsonMatch[0].replace(/```json|```/g, '').trim());
+      } else {
+        parsedResult = JSON.parse(content);
       }
-    };
+      
+      // Return the processed result
+      return {
+        success: true,
+        data: {
+          codeframe: parsedResult.codeframe || [],
+          codedResponses: parsedResult.codedResponses || [],
+          status: 'complete'
+        }
+      };
+    } catch (error) {
+      console.error("Error parsing OpenAI response:", error);
+      throw new Error("Failed to parse analysis results from OpenAI");
+    }
   } catch (error) {
     console.error("Getting processing results failed:", error);
     return {
