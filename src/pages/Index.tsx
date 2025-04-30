@@ -20,33 +20,28 @@ const IndexContent: React.FC = () => {
   
   return (
     <div className="space-y-6">
-      {!uploadedFile && (
-        <div id="api-config-section" className={`${apiConfig?.isConfigured ? 'hidden' : ''}`}>
-          {!apiConfig?.isConfigured && (
-            <Alert variant="info" className="mb-4 border-blue-300 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-              <InfoCircledIcon className="h-4 w-4 text-blue-500" />
-              <AlertTitle>Demo Mode Active</AlertTitle>
-              <AlertDescription>
-                You're currently using the app in demo mode. For real text analysis, please configure your API key below.
-              </AlertDescription>
-            </Alert>
-          )}
+      {/* Always show API config first if not configured */}
+      {!apiConfig?.isConfigured && (
+        <div id="api-config-section">
           <ApiKeyConfig />
         </div>
       )}
       
-      {!uploadedFile && <IntroCard />}
-      
-      <WorkflowSteps />
-      
-      <div className="space-y-6">
-        {!uploadedFile && <FileUploader />}
+      {/* Only show the rest of the content if API is configured or if we're just in demo mode */}
+      <div className={`${!apiConfig?.isConfigured ? 'opacity-50 pointer-events-none' : ''}`}>
+        {!uploadedFile && <IntroCard />}
         
-        {uploadedFile && !results && processingProgress === 0 && <FilePreview />}
+        <WorkflowSteps />
         
-        {processingProgress > 0 && <ProcessingStatus />}
-        
-        {results && <ResultsView />}
+        <div className="space-y-6">
+          {!uploadedFile && <FileUploader />}
+          
+          {uploadedFile && !results && processingProgress === 0 && <FilePreview />}
+          
+          {processingProgress > 0 && <ProcessingStatus />}
+          
+          {results && <ResultsView />}
+        </div>
       </div>
     </div>
   );
