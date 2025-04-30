@@ -548,8 +548,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         fileColumns.find(col => col.index === index)
       ).filter(Boolean) as ColumnInfo[];
       
-      // Send selected columns to API service - fixed by calling the service function directly
-      setSelectedColumns(selectedColumnsInfo);
+      // Call the API service function and then update our local state with the returned indices
+      // This ensures the API has access to the full column info while we maintain our number[] state
+      setSelectedColumns(setSelectedColumns(selectedColumnsInfo));
       
       const response = await processFile(uploadedFile.id, apiConfig || undefined);
       
