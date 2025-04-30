@@ -1,3 +1,4 @@
+
 import { ApiResponse, ProcessedResult, UploadedFile, ColumnInfo } from "../types";
 import * as XLSX from 'xlsx';
 
@@ -185,7 +186,7 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       }
     ];
     
-    // Make the API call to OpenAI
+    // Make the API call to OpenAI - Fix: Ensure we're using the correct API key format
     const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
       method: 'POST',
       headers: {
@@ -203,7 +204,7 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Processing failed with status ${response.status}`);
+      throw new Error(errorData.error?.message || errorData.message || `Processing failed with status ${response.status}`);
     }
     
     const data = await response.json();

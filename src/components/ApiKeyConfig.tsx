@@ -32,18 +32,22 @@ const ApiKeyConfig: React.FC = () => {
   const onSubmit = async (values: ApiConfigFormValues) => {
     setIsLoading(true);
     try {
-      // For demo purposes, always succeed with any key for now
-      // In production, this would check the actual API
-      setApiConfig({
-        apiKey: values.apiKey,
-        apiUrl: values.apiUrl,
-        isConfigured: true
-      });
+      // Test the API connection first
+      const success = await testApiConnection(values.apiKey, values.apiUrl);
       
-      toast({
-        title: "API Key Configured",
-        description: "Your API key has been saved successfully.",
-      });
+      if (success) {
+        // Only set the config if the test was successful
+        setApiConfig({
+          apiKey: values.apiKey,
+          apiUrl: values.apiUrl,
+          isConfigured: true
+        });
+        
+        toast({
+          title: "API Key Configured",
+          description: "Your API key has been saved successfully.",
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
