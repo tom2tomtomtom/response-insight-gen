@@ -10,7 +10,7 @@ import FilePreview from '../components/FilePreview';
 import ProcessingStatus from '../components/ProcessingStatus';
 import ResultsView from '../components/ResultsView';
 import ApiKeyConfig from '../components/ApiKeyConfig';
-import ColumnSelector from '../components/ColumnSelector'; // Fix the import path
+import ColumnSelector from '../components/ColumnSelector';
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {
@@ -18,8 +18,10 @@ const IndexContent: React.FC = () => {
   
   return (
     <div className="space-y-6">
-      {!uploadedFile && !apiConfig?.isConfigured && (
-        <ApiKeyConfig />
+      {!uploadedFile && (
+        <div id="api-config-section" className={`${apiConfig?.isConfigured ? 'hidden' : ''}`}>
+          <ApiKeyConfig />
+        </div>
       )}
       
       {!uploadedFile && <IntroCard />}

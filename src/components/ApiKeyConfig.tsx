@@ -5,9 +5,10 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from './ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from './ui/form';
 import { useForm } from 'react-hook-form';
-import { Key, CheckCircle2 } from 'lucide-react';
+import { Key, CheckCircle2, ExternalLink } from 'lucide-react';
+import { toast } from './ui/use-toast';
 
 interface ApiConfigFormValues {
   apiKey: string;
@@ -35,7 +36,17 @@ const ApiKeyConfig: React.FC = () => {
           apiUrl: values.apiUrl,
           isConfigured: true
         });
+        toast({
+          title: "API Key Configured",
+          description: "Your API key has been verified and saved successfully.",
+        });
       }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "API Connection Failed",
+        description: error instanceof Error ? error.message : "Could not verify API key",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -101,6 +112,22 @@ const ApiKeyConfig: React.FC = () => {
             >
               {isLoading ? "Verifying..." : "Save & Verify API Key"}
             </Button>
+
+            {!apiConfig?.isConfigured && (
+              <div className="text-center text-sm text-muted-foreground mt-2">
+                <p>Don't have an API key?{' '}
+                  <a 
+                    href="https://docs.example.com/api-access" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="text-primary inline-flex items-center hover:underline"
+                  >
+                    Get access
+                    <ExternalLink className="ml-1 h-3 w-3" />
+                  </a>
+                </p>
+              </div>
+            )}
           </form>
         </Form>
       </CardContent>
