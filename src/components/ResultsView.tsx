@@ -4,14 +4,15 @@ import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { Loader2, Download, RefreshCw, Filter } from 'lucide-react';
+import { Loader2, Download, RefreshCw, Filter, AlertCircle } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { ColumnInfo } from '../types';
 
 const ResultsView: React.FC = () => {
-  const { results, isGeneratingExcel, downloadResults, resetState, fileColumns } = useProcessing();
+  const { results, isGeneratingExcel, downloadResults, resetState, fileColumns, apiConfig } = useProcessing();
   const [searchFilter, setSearchFilter] = useState('');
   const [columnFilter, setColumnFilter] = useState<string>('all');
   
@@ -47,6 +48,15 @@ const ResultsView: React.FC = () => {
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Analysis Results</CardTitle>
+        {!apiConfig?.isConfigured && (
+          <Alert variant="warning" className="mt-2 border-orange-300 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+            <AlertCircle className="h-4 w-4 text-orange-500" />
+            <AlertTitle>Demo Results</AlertTitle>
+            <AlertDescription>
+              You're viewing demo results. For real analysis, please configure an API key.
+            </AlertDescription>
+          </Alert>
+        )}
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="codeframe">

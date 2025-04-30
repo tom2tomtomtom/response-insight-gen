@@ -2,132 +2,34 @@
 import { ApiResponse, ProcessedResult, UploadedFile, ColumnInfo } from "../types";
 import * as XLSX from 'xlsx';
 
-// Default API endpoint for the mock service
-const DEFAULT_API_URL = "https://api.example.com";
+// Default API endpoint for the text analysis service
+const DEFAULT_API_URL = "https://api.textanalysis.com/v1";
 
-// Mock data for demonstration purposes
-let mockFileId = "mock-file-id";
-let processingTimer: ReturnType<typeof setTimeout>;
-let userUploadedResponses: string[] = [];
+// Store selected columns for processing
 let userSelectedColumns: ColumnInfo[] = [];
 
-const mockCodeframe = [
-  {
-    code: "C01",
-    label: "Ease of Use",
-    definition: "Comments related to how easy or difficult the product is to use",
-    examples: ["Very intuitive interface", "Easy to navigate", "Straightforward to set up"]
-  },
-  {
-    code: "C02",
-    label: "Performance",
-    definition: "Comments about the speed, reliability, or efficiency of the product",
-    examples: ["Runs smoothly", "No lag time", "Quick response"]
-  },
-  {
-    code: "C03",
-    label: "Features",
-    definition: "Mentions of specific product features or functionality",
-    examples: ["Love the search capability", "The dashboard is comprehensive", "Export feature saves time"]
-  },
-  {
-    code: "C04",
-    label: "Value",
-    definition: "Comments about price, ROI, or overall value proposition",
-    examples: ["Worth every penny", "Good price for what you get", "Expensive but worth it"]
-  },
-  {
-    code: "C05",
-    label: "Support",
-    definition: "Feedback about customer service or technical support",
-    examples: ["Support team was helpful", "Quick response to my questions", "Documentation is thorough"]
-  }
-];
-
-// Store selected columns
+// Set selected columns
 export const setSelectedColumns = (columns: ColumnInfo[]) => {
   userSelectedColumns = columns;
-};
-
-// Helper function to extract real responses and randomly assign codes from the codeframe
-const generateMockCodedResponses = (responses: string[]) => {
-  // If we have selected columns, generate responses with column context
-  if (userSelectedColumns.length > 0) {
-    const result = [];
-    
-    // Use responses from each selected column
-    for (const column of userSelectedColumns) {
-      // For demonstration, we'll create mock responses for each column
-      const columnResponses = [];
-      
-      // Generate 3-5 responses per column for demonstration
-      const responseCount = Math.floor(Math.random() * 3) + 3;
-      
-      for (let i = 0; i < responseCount; i++) {
-        // Randomly assign 1-2 codes to each response
-        const numCodes = Math.floor(Math.random() * 2) + 1;
-        const allCodes = mockCodeframe.map(item => item.code);
-        const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
-        const codesAssigned = shuffledCodes.slice(0, numCodes);
-        
-        // Create a fake response or use an example if available
-        let responseText = column.examples[i % column.examples.length];
-        if (!responseText) {
-          const responses = [
-            "This is really helpful and easy to use.",
-            "I found the product to be a bit slow at times.",
-            "The features are comprehensive but the price is high.",
-            "Customer support was responsive when I had questions.",
-            "Very intuitive interface overall.",
-            "Worth the money for what you get."
-          ];
-          responseText = responses[Math.floor(Math.random() * responses.length)];
-        }
-        
-        columnResponses.push({
-          responseText,
-          columnName: column.name,
-          columnIndex: column.index,
-          codesAssigned
-        });
-      }
-      
-      result.push(...columnResponses);
-    }
-    
-    return result;
-  }
-  
-  // Fall back to the old way if no columns selected
-  return responses.map(responseText => {
-    // Randomly assign 1-2 codes to each response
-    const numCodes = Math.floor(Math.random() * 2) + 1;
-    const allCodes = mockCodeframe.map(item => item.code);
-    const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
-    const codesAssigned = shuffledCodes.slice(0, numCodes);
-    
-    return {
-      responseText,
-      codesAssigned
-    };
-  });
 };
 
 // Test API connection with provided key
 export const testApiConnection = async (apiKey: string, apiUrl: string): Promise<boolean> => {
   try {
-    // In a real implementation, this would check if the API key is valid
-    // Here, we'll just simulate a check
+    // Make a real API call to test the connection
+    const response = await fetch(`${apiUrl || DEFAULT_API_URL}/test`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
     
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // For now, we'll assume any non-empty key is valid
-    if (!apiKey.trim()) {
-      throw new Error("API key is required");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `API returned status ${response.status}`);
     }
     
-    // Return success
     return true;
   } catch (error) {
     console.error("API connection test failed:", error);
@@ -135,35 +37,45 @@ export const testApiConnection = async (apiKey: string, apiUrl: string): Promise
   }
 };
 
-// Upload file to server
+// Upload file to the analysis service
 export const uploadFile = async (file: File, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<UploadedFile>> => {
-  // In a real implementation, this would be a fetch call to your API
   try {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // If we have API config, we'd use it here to make a real API call
-    if (apiConfig?.apiKey) {
-      console.log(`Using API key ${apiConfig.apiKey.substring(0, 3)}... to upload to ${apiConfig.apiUrl || DEFAULT_API_URL}`);
-      // In a real implementation:
-      // return await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/upload`, {
-      //   method: 'POST',
-      //   headers: { 'Authorization': `Bearer ${apiConfig.apiKey}` },
-      //   body: formData
-      // }).then(res => res.json());
+    if (!apiConfig?.apiKey) {
+      // For demo purposes, generate a mock response if no API key is provided
+      return mockUploadFile(file);
     }
     
-    // Simulate API response
+    // Create form data for file upload
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Make actual API call
+    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiConfig.apiKey}`
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Upload failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
     return {
       success: true,
       data: {
-        id: mockFileId,
+        id: data.fileId,
         filename: file.name,
         status: 'uploaded',
         uploadedAt: new Date()
       }
     };
   } catch (error) {
+    console.error("File upload failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -171,113 +83,276 @@ export const uploadFile = async (file: File, apiConfig?: { apiKey: string, apiUr
   }
 };
 
+// Mock upload function for demo purposes when no API key is provided
+const mockUploadFile = async (file: File): Promise<ApiResponse<UploadedFile>> => {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  return {
+    success: true,
+    data: {
+      id: "demo-file-id",
+      filename: file.name,
+      status: 'uploaded',
+      uploadedAt: new Date()
+    }
+  };
+};
+
 // Process the uploaded file
 export const processFile = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<UploadedFile>> => {
   try {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // If we have API config, we'd use it here to make a real API call
-    if (apiConfig?.apiKey) {
-      console.log(`Using API key ${apiConfig.apiKey.substring(0, 3)}... to process file at ${apiConfig.apiUrl || DEFAULT_API_URL}`);
-      // In a real implementation:
-      // return await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/process/${fileId}`, {
-      //   method: 'POST',
-      //   headers: { 'Authorization': `Bearer ${apiConfig.apiKey}` }
-      // }).then(res => res.json());
+    if (!apiConfig?.apiKey) {
+      // For demo purposes, return a mock response if no API key is provided
+      return mockProcessFile(fileId);
     }
     
-    // Start mock processing timer
-    clearTimeout(processingTimer);
+    // Prepare the processing request with selected columns
+    const requestBody = {
+      fileId,
+      columns: userSelectedColumns
+    };
     
-    // Simulate API response
+    // Make the actual API call
+    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/process`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiConfig.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Processing failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
     return {
       success: true,
       data: {
         id: fileId,
-        filename: 'responses.xlsx',
+        filename: data.filename || 'processed_file.xlsx',
         status: 'processing'
       }
     };
   } catch (error) {
+    console.error("File processing failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
 };
+
+// Mock process function for demo purposes when no API key is provided
+const mockProcessFile = async (fileId: string): Promise<ApiResponse<UploadedFile>> => {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  return {
+    success: true,
+    data: {
+      id: fileId,
+      filename: 'responses.xlsx',
+      status: 'processing'
+    }
+  };
+};
+
+// Store user responses
+let userUploadedResponses: string[] = [];
 
 // Store the real responses for use in the API
 export const setUserResponses = (responses: string[]) => {
   userUploadedResponses = responses;
 };
 
-// Get the processing status and results
+// Get the processing result
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
-    // Simulate processing delay (in a real app, this would check the actual status)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // If we have API config, we'd use it here to make a real API call
-    if (apiConfig?.apiKey) {
-      console.log(`Using API key ${apiConfig.apiKey.substring(0, 3)}... to get results from ${apiConfig.apiUrl || DEFAULT_API_URL}`);
-      // In a real implementation:
-      // return await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/results/${fileId}`, {
-      //   headers: { 'Authorization': `Bearer ${apiConfig.apiKey}` }
-      // }).then(res => res.json());
+    if (!apiConfig?.apiKey) {
+      // For demo purposes, return a mock response if no API key is provided
+      return mockGetProcessingResult(fileId);
     }
     
-    // Use real uploaded responses if available
-    const codedResponses = userUploadedResponses.length > 0
-      ? generateMockCodedResponses(userUploadedResponses)
-      : [
-          {
-            responseText: "The interface is so intuitive, I was able to figure it out without reading any instructions.",
-            codesAssigned: ["C01"],
-            columnName: "Overall Comments",
-            columnIndex: 0
-          },
-          {
-            responseText: "Sometimes it runs slowly when processing large files, but overall it's been reliable.",
-            codesAssigned: ["C02"],
-            columnName: "Performance Feedback",
-            columnIndex: 1
-          },
-          {
-            responseText: "I love the export to Excel feature, it saves me hours every week. Well worth the price!",
-            codesAssigned: ["C03", "C04"],
-            columnName: "Feature Comments",
-            columnIndex: 2
-          },
-          {
-            responseText: "Customer support responded within minutes when I had a question. The dashboard is also great.",
-            codesAssigned: ["C05", "C03"],
-            columnName: "Support Experience",
-            columnIndex: 3
-          },
-          {
-            responseText: "Very easy to use and the price is reasonable for what you get.",
-            codesAssigned: ["C01", "C04"],
-            columnName: "Value Assessment",
-            columnIndex: 4
-          }
-        ];
+    // Make the actual API call
+    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}/results/${fileId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiConfig.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
     
-    // Return mock results
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Getting results failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
     return {
       success: true,
       data: {
-        codeframe: mockCodeframe,
-        codedResponses: codedResponses,
+        codeframe: data.codeframe,
+        codedResponses: data.codedResponses,
         status: 'complete'
       }
     };
   } catch (error) {
+    console.error("Getting processing results failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
+};
+
+// Mock processing result function for demo purposes when no API key is provided
+const mockGetProcessingResult = async (fileId: string): Promise<ApiResponse<ProcessedResult>> => {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Mock codeframe for demonstration
+  const mockCodeframe = [
+    {
+      code: "C01",
+      label: "Ease of Use",
+      definition: "Comments related to how easy or difficult the product is to use",
+      examples: ["Very intuitive interface", "Easy to navigate", "Straightforward to set up"]
+    },
+    {
+      code: "C02",
+      label: "Performance",
+      definition: "Comments about the speed, reliability, or efficiency of the product",
+      examples: ["Runs smoothly", "No lag time", "Quick response"]
+    },
+    {
+      code: "C03",
+      label: "Features",
+      definition: "Mentions of specific product features or functionality",
+      examples: ["Love the search capability", "The dashboard is comprehensive", "Export feature saves time"]
+    },
+    {
+      code: "C04",
+      label: "Value",
+      definition: "Comments about price, ROI, or overall value proposition",
+      examples: ["Worth every penny", "Good price for what you get", "Expensive but worth it"]
+    },
+    {
+      code: "C05",
+      label: "Support",
+      definition: "Feedback about customer service or technical support",
+      examples: ["Support team was helpful", "Quick response to my questions", "Documentation is thorough"]
+    }
+  ];
+  
+  // Generate mock coded responses based on user-uploaded data
+  const generateMockCodedResponses = () => {
+    // If we have selected columns, use that data
+    if (userSelectedColumns.length > 0 && userUploadedResponses.length > 0) {
+      console.log("Generating mock results from user data");
+      
+      const result = [];
+      
+      // Use responses from each selected column
+      for (const column of userSelectedColumns) {
+        const examples = column.examples || [];
+        
+        // For each example in the column, create a coded response
+        for (let i = 0; i < examples.length && i < 5; i++) {
+          const responseText = examples[i];
+          
+          // Only include substantive responses
+          if (responseText && responseText.length > 5) {
+            // Randomly assign 1-2 codes
+            const numCodes = Math.floor(Math.random() * 2) + 1;
+            const allCodes = mockCodeframe.map(item => item.code);
+            const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
+            const codesAssigned = shuffledCodes.slice(0, numCodes);
+            
+            result.push({
+              responseText,
+              columnName: column.name,
+              columnIndex: column.index,
+              codesAssigned
+            });
+          }
+        }
+        
+        // If we have user uploaded responses, use some of those too
+        const columnResponses = userUploadedResponses.slice(0, 10);
+        for (let i = 0; i < columnResponses.length && i < 5; i++) {
+          const responseText = columnResponses[i];
+          
+          // Only include substantive responses
+          if (responseText && responseText.length > 5) {
+            // Randomly assign 1-2 codes
+            const numCodes = Math.floor(Math.random() * 2) + 1;
+            const allCodes = mockCodeframe.map(item => item.code);
+            const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
+            const codesAssigned = shuffledCodes.slice(0, numCodes);
+            
+            result.push({
+              responseText,
+              columnName: column.name,
+              columnIndex: column.index,
+              codesAssigned
+            });
+          }
+        }
+      }
+      
+      return result;
+    }
+    
+    // Fallback to default mock data
+    return [
+      {
+        responseText: "The interface is so intuitive, I was able to figure it out without reading any instructions.",
+        codesAssigned: ["C01"],
+        columnName: "Overall Comments",
+        columnIndex: 0
+      },
+      {
+        responseText: "Sometimes it runs slowly when processing large files, but overall it's been reliable.",
+        codesAssigned: ["C02"],
+        columnName: "Performance Feedback",
+        columnIndex: 1
+      },
+      {
+        responseText: "I love the export to Excel feature, it saves me hours every week. Well worth the price!",
+        codesAssigned: ["C03", "C04"],
+        columnName: "Feature Comments",
+        columnIndex: 2
+      },
+      {
+        responseText: "Customer support responded within minutes when I had a question. The dashboard is also great.",
+        codesAssigned: ["C05", "C03"],
+        columnName: "Support Experience",
+        columnIndex: 3
+      },
+      {
+        responseText: "Very easy to use and the price is reasonable for what you get.",
+        codesAssigned: ["C01", "C04"],
+        columnName: "Value Assessment",
+        columnIndex: 4
+      }
+    ];
+  };
+  
+  // Return mock results
+  return {
+    success: true,
+    data: {
+      codeframe: mockCodeframe,
+      codedResponses: generateMockCodedResponses(),
+      status: 'complete'
+    }
+  };
 };
 
 // Function to generate an Excel file from the results

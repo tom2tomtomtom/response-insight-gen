@@ -11,6 +11,8 @@ import ProcessingStatus from '../components/ProcessingStatus';
 import ResultsView from '../components/ResultsView';
 import ApiKeyConfig from '../components/ApiKeyConfig';
 import ColumnSelector from '../components/ColumnSelector';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { InfoCircledIcon } from "@radix-ui/react-icons";
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {
@@ -20,6 +22,15 @@ const IndexContent: React.FC = () => {
     <div className="space-y-6">
       {!uploadedFile && (
         <div id="api-config-section" className={`${apiConfig?.isConfigured ? 'hidden' : ''}`}>
+          {!apiConfig?.isConfigured && (
+            <Alert variant="info" className="mb-4 border-blue-300 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+              <InfoCircledIcon className="h-4 w-4 text-blue-500" />
+              <AlertTitle>Demo Mode Active</AlertTitle>
+              <AlertDescription>
+                You're currently using the app in demo mode. For real text analysis, please configure your API key below.
+              </AlertDescription>
+            </Alert>
+          )}
           <ApiKeyConfig />
         </div>
       )}
