@@ -8,7 +8,7 @@ import {
   generateExcelFile, 
   testApiConnection, 
   setUserResponses,
-  setSelectedColumns
+  setApiSelectedColumns
 } from '../services/api';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -548,9 +548,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         fileColumns.find(col => col.index === index)
       ).filter(Boolean) as ColumnInfo[];
       
-      // Call the API service function and then update our local state with the returned indices
-      // This ensures the API has access to the full column info while we maintain our number[] state
-      setSelectedColumns(setSelectedColumns(selectedColumnsInfo));
+      // Call the API service function to store the column info
+      // We use a different name for the imported function to avoid confusion
+      setApiSelectedColumns(selectedColumnsInfo);
       
       const response = await processFile(uploadedFile.id, apiConfig || undefined);
       

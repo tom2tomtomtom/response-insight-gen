@@ -7,11 +7,9 @@ const DEFAULT_API_URL = "https://api.openai.com/v1/chat/completions";
 // Store selected columns for processing
 let userSelectedColumns: ColumnInfo[] = [];
 
-// Set selected columns - Updated to store the column info objects and return column indices
-export const setSelectedColumns = (columns: ColumnInfo[]): number[] => {
+// Set selected columns - renamed to avoid naming conflicts in ProcessingContext
+export const setApiSelectedColumns = (columns: ColumnInfo[]): void => {
   userSelectedColumns = columns;
-  // Return array of column indices for state management in the context
-  return columns.map(col => col.index);
 };
 
 // Test API connection with provided key
