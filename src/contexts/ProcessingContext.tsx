@@ -276,14 +276,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
             }
           });
           
-          // Auto-select ONLY text columns, not numeric or mixed
-          const autoSelectedColumns = columnInfos
-            .filter(col => col.type === 'text')
-            .map(col => col.index);
-            
-          setSelectedColumns(autoSelectedColumns);
+          // Remove auto-selection of columns - start with empty selection
+          setSelectedColumns([]);
           
-          console.log(`Found ${columnInfos.length} columns, ${autoSelectedColumns.length} text columns`);
+          console.log(`Found ${columnInfos.length} columns, but none automatically selected`);
           
           // Return both column info and text responses
           resolve({ 
@@ -406,14 +402,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
               }
             });
             
-            // Auto-select ONLY text columns, not numeric or mixed
-            const autoSelectedColumns = columnInfos
-              .filter(col => col.type === 'text')
-              .map(col => col.index);
-              
-            setSelectedColumns(autoSelectedColumns);
+            // Remove auto-selection of columns - start with empty selection
+            setSelectedColumns([]);
             
-            console.log(`Found ${columnInfos.length} columns, ${autoSelectedColumns.length} text columns`);
+            console.log(`Found ${columnInfos.length} columns, but none automatically selected`);
             
             // Return both column info and text responses
             resolve({ 
