@@ -543,8 +543,13 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       setProcessingStatus('Preparing selected columns...');
       setProcessingProgress(10);
       
+      // Get the selected column info objects from fileColumns
+      const selectedColumnsInfo = selectedColumns.map(index => 
+        fileColumns.find(col => col.index === index)
+      ).filter(Boolean) as ColumnInfo[];
+      
       // Send selected columns to API
-      setSelectedColumns(selectedColumns); // Only send the array of indices
+      setSelectedColumns(selectedColumnsInfo);
       
       const response = await processFile(uploadedFile.id, apiConfig || undefined);
       

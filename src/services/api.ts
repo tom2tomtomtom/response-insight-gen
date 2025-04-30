@@ -120,8 +120,9 @@ const mockProcessFile = async (fileId: string): Promise<ApiResponse<UploadedFile
 // Get the processing result
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
+    // If no API key is provided, fall back to mock data
     if (!apiConfig?.apiKey) {
-      // For demo purposes, return a mock response if no API key is provided
+      console.log("No API key provided, using mock data");
       return mockGetProcessingResult(fileId);
     }
     
@@ -132,11 +133,29 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       throw new Error("No columns selected for processing");
     }
     
-    // Prepare the data we want to send to the OpenAI API
-    const columnData = userSelectedColumns.map(column => ({
-      name: column.name,
-      examples: column.examples || []
-    }));
+    // Extract examples from selected columns to send to the API
+    const selectedColumnsData = [];
+    
+    for (const columnInfo of userSelectedColumns) {
+      // Get all responses for this column, not just examples
+      const allColumnResponses = columnInfo.examples || [];
+      
+      // Only add columns that have some responses
+      if (allColumnResponses.length > 0) {
+        selectedColumnsData.push({
+          name: columnInfo.name,
+          index: columnInfo.index,
+          responses: allColumnResponses
+        });
+      }
+    }
+    
+    // If no columns with responses were found, throw an error
+    if (selectedColumnsData.length === 0) {
+      throw new Error("Selected columns don't contain any responses to analyze");
+    }
+    
+    console.log("Sending selected column data to OpenAI:", selectedColumnsData);
     
     // Create a prompt for OpenAI to analyze the data
     const messages = [
@@ -148,8 +167,8 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       },
       {
         role: "user",
-        content: `I have a survey with the following open-ended questions:
-        ${JSON.stringify(columnData, null, 2)}
+        content: `I have a survey with the following open-ended questions and responses:
+        ${JSON.stringify(selectedColumnsData, null, 2)}
         
         Please analyze these responses and:
         1. Create a codeframe with 5-8 distinct codes
