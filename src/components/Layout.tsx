@@ -1,12 +1,15 @@
+
 import React from 'react';
 import AiSky from './AiSky';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
-import { Settings2 } from 'lucide-react';
+import { Settings2, FileCode, Home } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+
 interface LayoutProps {
   children: React.ReactNode;
 }
+
 const Layout: React.FC<LayoutProps> = ({
   children
 }) => {
@@ -15,6 +18,7 @@ const Layout: React.FC<LayoutProps> = ({
   } = useProcessing();
   const navigate = useNavigate();
   const location = useLocation();
+  
   const handleConfigClick = () => {
     if (location.pathname === '/') {
       // If we're on the homepage, scroll to the API config section
@@ -30,17 +34,33 @@ const Layout: React.FC<LayoutProps> = ({
       navigate('/');
     }
   };
+
+  const handleCodeframeUploadClick = () => {
+    navigate('/upload-codeframe');
+  };
+
   return <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col relative">
       <AiSky />
       
       <header className="bg-white/80 backdrop-blur-sm shadow-sm py-4 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            
             <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">monigle codify</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">Alpha Version</span>
+            
+            {location.pathname !== '/' && (
+              <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={() => navigate('/')}>
+                <Home className="h-4 w-4" />
+                Home
+              </Button>
+            )}
+
+            <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={handleCodeframeUploadClick}>
+              <FileCode className="h-4 w-4" />
+              Upload Codeframe
+            </Button>
             
             <Button variant={apiConfig?.isConfigured ? "outline" : "default"} size="sm" className={`flex items-center gap-1 ${apiConfig?.isConfigured ? 'border-green-500 text-green-600' : ''}`} onClick={handleConfigClick}>
               <Settings2 className="h-4 w-4" />
@@ -61,4 +81,5 @@ const Layout: React.FC<LayoutProps> = ({
       </footer>
     </div>;
 };
+
 export default Layout;

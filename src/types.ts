@@ -8,9 +8,12 @@ export interface UploadedFile {
 
 export interface CodeframeEntry {
   code: string;
+  numeric: string; // Adding numeric code support
   label: string;
   definition: string;
   examples: string[];
+  count?: number; // Track count of usages
+  percentage?: number; // Track percentage of responses
 }
 
 export interface CodedResponse {
@@ -20,9 +23,18 @@ export interface CodedResponse {
   columnIndex?: number; // Add column index for reference
 }
 
+export interface CodeSummary {
+  code: string;
+  numeric: string;
+  label: string;
+  count: number;
+  percentage: number;
+}
+
 export interface ProcessedResult {
   codeframe: CodeframeEntry[];
   codedResponses: CodedResponse[];
+  codeSummary: CodeSummary[]; // Add summary stats for codes
   status: 'complete' | 'processing' | 'failed';
   error?: string;
 }
@@ -53,4 +65,9 @@ export interface ColumnInfo {
   type: 'text' | 'numeric' | 'mixed' | 'empty'; // Type of data in the column
   examples: string[]; // Example values (first few values)
   stats: ColumnStats; // Statistics about the column
+}
+
+export interface UploadedCodeframe {
+  name: string;
+  entries: CodeframeEntry[];
 }

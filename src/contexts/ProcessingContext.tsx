@@ -1,14 +1,16 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo } from '../types';
+import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo, UploadedCodeframe } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { 
   uploadFile, 
   processFile, 
   getProcessingResult, 
-  generateExcelFile, 
+  generateExcelFile,
+  generateExcelWithOriginalData,
   testApiConnection, 
   setUserResponses,
-  setApiSelectedColumns
+  setApiSelectedColumns,
+  setUploadedCodeframe as setApiUploadedCodeframe
 } from '../services/api';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
@@ -26,14 +28,20 @@ interface ProcessingContextType {
   fileColumns: ColumnInfo[];
   selectedColumns: number[];
   searchQuery: string;
+  uploadedCodeframes: UploadedCodeframe[];
+  activeCodeframe: UploadedCodeframe | null;
+  rawFileData: any[][] | null;
   setApiConfig: (config: ApiConfig) => void;
   testApiConnection: (apiKey: string, apiUrl: string) => Promise<boolean>;
   handleFileUpload: (file: File) => Promise<void>;
   startProcessing: () => Promise<void>;
   downloadResults: () => Promise<void>;
+  downloadOriginalWithCodes: () => Promise<void>;
   resetState: () => void;
   toggleColumnSelection: (columnIndex: number) => void;
   setSearchQuery: (query: string) => void;
+  saveUploadedCodeframe: (codeframe: UploadedCodeframe) => void;
+  setActiveCodeframe: (codeframe: UploadedCodeframe | null) => void;
 }
 
 const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
@@ -51,6 +59,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [fileColumns, setFileColumns] = useState<ColumnInfo[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [uploadedCodeframes, setUploadedCodeframes] = useState<UploadedCodeframe[]>([]);
+  const [activeCodeframe, setActiveCodeframe] = useState<UploadedCodeframe | null>(null);
+  const [rawFileData, setRawFileData] = useState<any[][] | null>(null);
 
   // Analyze a sample of values to determine column type and statistics
   const analyzeColumnValues = (values: any[]): { 
@@ -151,7 +162,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // Improved Excel file parsing
-  const parseExcelFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[] }> => {
+  const parseExcelFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[], rawData: any[][] }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       
@@ -200,6 +211,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
           
           // Extract data rows (skip header if it exists)
           const dataRows = hasHeaders ? jsonData.slice(1) : jsonData;
+          
+          // Store raw file data for later use
+          const rawData = hasHeaders ? [jsonData[0], ...dataRows] : jsonData;
           
           // Transpose the data to get column-oriented arrays
           const columnCount = Math.max(...dataRows.map((row: any) => 
@@ -250,7 +264,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
             // Get non-empty examples
             const examples = columnData
               .filter((value: any) => value !== undefined && value !== null && value !== '')
-              .slice(0, 2)
+              .slice(0, 5)
               .map(String);
               
             columnInfos.push({
@@ -284,7 +298,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
           // Return both column info and text responses
           resolve({ 
             columns: columnInfos,
-            responses: textResponses
+            responses: textResponses,
+            rawData
           });
         } catch (error) {
           console.error("Excel parsing error:", error);
@@ -301,7 +316,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // Improved CSV file parsing
-  const parseCSVFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[] }> => {
+  const parseCSVFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[], rawData: any[][] }> => {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
         header: false, // We'll handle headers ourselves
@@ -314,6 +329,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
               reject(new Error('No data found in the CSV file'));
               return;
             }
+            
+            // Store raw file data for later use
+            const rawData = [...results.data];
             
             // Check if the first row looks like headers
             const firstRow = results.data[0] as any[];
@@ -376,7 +394,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
               // Get non-empty examples
               const examples = columnData
                 .filter((value: any) => value !== undefined && value !== null && value !== '')
-                .slice(0, 2)
+                .slice(0, 5)
                 .map(String);
                 
               columnInfos.push({
@@ -410,7 +428,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
             // Return both column info and text responses
             resolve({ 
               columns: columnInfos,
-              responses: textResponses
+              responses: textResponses,
+              rawData
             });
           } catch (error) {
             console.error("CSV parsing error:", error);
@@ -455,13 +474,25 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
+  // Save uploaded codeframe
+  const saveUploadedCodeframe = (codeframe: UploadedCodeframe) => {
+    setUploadedCodeframes(prev => [...prev, codeframe]);
+    setActiveCodeframe(codeframe);
+    setApiUploadedCodeframe(codeframe);
+    
+    toast({
+      title: "Codeframe Saved",
+      description: `"${codeframe.name}" with ${codeframe.entries.length} codes is now available for use.`
+    });
+  };
+
   // Handle file upload
   const handleFileUpload = async (file: File) => {
     try {
       setIsUploading(true);
       setProcessingStatus('Parsing file...');
       
-      let parseResult: { columns: ColumnInfo[], responses: string[] };
+      let parseResult: { columns: ColumnInfo[], responses: string[], rawData: any[][] };
       
       // Parse file based on type
       if (file.name.toLowerCase().endsWith('.csv')) {
@@ -474,13 +505,15 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         throw new Error('Unsupported file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
       }
       
-      const { columns, responses } = parseResult;
+      const { columns, responses, rawData } = parseResult;
       
       console.log("Total columns found:", columns.length);
       console.log("Total text responses found:", responses.length);
+      console.log("Raw data rows:", rawData.length);
       
       setFileColumns(columns);
       setRawResponses(responses);
+      setRawFileData(rawData);
       setUserResponses(responses);
       
       // Continue with the upload process
@@ -661,6 +694,48 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  // Generate and download Excel file with original data and codes
+  const downloadOriginalWithCodes = async () => {
+    if (!results || !rawFileData) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No results or original data available to download",
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingExcel(true);
+      setProcessingStatus('Generating Excel with original data...');
+      
+      const excelBlob = await generateExcelWithOriginalData(results, rawFileData);
+      
+      // Create a download link and trigger it
+      const url = URL.createObjectURL(excelBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'survey_with_codes.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download Started",
+        description: "Your Excel file with original data and codes is being downloaded",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: error instanceof Error ? error.message : "An error occurred while generating the Excel file",
+      });
+    } finally {
+      setIsGeneratingExcel(false);
+    }
+  };
+
   // Reset the entire state
   const resetState = () => {
     setUploadedFile(null);
@@ -674,7 +749,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setFileColumns([]);
     setSelectedColumns([]);
     setSearchQuery('');
-    // Note: We don't reset the API config on purpose
+    setRawFileData(null);
+    // Note: We don't reset the API config and uploaded codeframes on purpose
   };
 
   const value = {
@@ -690,14 +766,20 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     fileColumns,
     selectedColumns,
     searchQuery,
+    uploadedCodeframes,
+    activeCodeframe,
+    rawFileData,
     setApiConfig,
     testApiConnection: handleTestApiConnection,
     handleFileUpload,
     startProcessing,
     downloadResults,
+    downloadOriginalWithCodes,
     resetState,
     toggleColumnSelection,
-    setSearchQuery
+    setSearchQuery,
+    saveUploadedCodeframe,
+    setActiveCodeframe
   };
 
   return (

@@ -1,5 +1,4 @@
-
-import { ApiResponse, ProcessedResult, UploadedFile, ColumnInfo } from "../types";
+import { ApiResponse, ProcessedResult, UploadedFile, ColumnInfo, UploadedCodeframe } from "../types";
 import * as XLSX from 'xlsx';
 
 // Default API endpoint for the text analysis service
@@ -8,9 +7,17 @@ const DEFAULT_API_URL = "https://api.openai.com/v1/chat/completions";
 // Store selected columns for processing
 let userSelectedColumns: ColumnInfo[] = [];
 
+// Store uploaded codeframe if provided
+let userUploadedCodeframe: UploadedCodeframe | null = null;
+
 // Set selected columns - renamed to avoid naming conflicts in ProcessingContext
 export const setApiSelectedColumns = (columns: ColumnInfo[]): void => {
   userSelectedColumns = columns;
+};
+
+// Set uploaded codeframe for use in API
+export const setUploadedCodeframe = (codeframe: UploadedCodeframe | null): void => {
+  userUploadedCodeframe = codeframe;
 };
 
 // Test API connection with provided key
@@ -117,6 +124,71 @@ const mockProcessFile = async (fileId: string): Promise<ApiResponse<UploadedFile
   };
 };
 
+// Calculate code percentages based on usage
+const calculateCodePercentages = (codedResponses: any[], codeframe: any[]) => {
+  // Count occurrences of each code
+  const codeCounts: Record<string, number> = {};
+  let totalCodeAssignments = 0;
+  
+  // Count occurrences of each code in responses
+  codedResponses.forEach(response => {
+    response.codesAssigned.forEach((code: string) => {
+      codeCounts[code] = (codeCounts[code] || 0) + 1;
+      totalCodeAssignments++;
+    });
+  });
+  
+  // Update codeframe with counts and percentages
+  const updatedCodeframe = codeframe.map(code => {
+    const count = codeCounts[code.code] || 0;
+    const percentage = totalCodeAssignments > 0 ? (count / codedResponses.length) * 100 : 0;
+    
+    return {
+      ...code,
+      count,
+      percentage
+    };
+  });
+  
+  // Sort codes by percentage descending for the summary
+  const codeSummary = updatedCodeframe
+    .map(code => ({
+      code: code.code,
+      numeric: code.numeric || code.code.replace(/[^0-9.]/g, ''),
+      label: code.label,
+      count: code.count || 0,
+      percentage: code.percentage || 0
+    }))
+    .sort((a, b) => b.percentage - a.percentage);
+  
+  return {
+    updatedCodeframe,
+    codeSummary
+  };
+};
+
+// Ensure numeric codes format
+const ensureNumericCodes = (codeframe: any[]) => {
+  // First check if numeric codes are already present
+  const hasNumericCodes = codeframe.some(code => code.numeric);
+  
+  if (hasNumericCodes) {
+    return codeframe;
+  }
+  
+  // If not, generate numeric codes
+  return codeframe.map((code, index) => {
+    // Extract numeric part if code already has a number format like "C01"
+    const numericPart = code.code.replace(/[^0-9.]/g, '');
+    const numeric = numericPart.length > 0 ? numericPart : (index + 1).toString();
+    
+    return {
+      ...code,
+      numeric
+    };
+  });
+};
+
 // Get the processing result
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
@@ -158,31 +230,52 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     console.log("Sending selected column data to OpenAI:", selectedColumnsData);
     
     // Create a prompt for OpenAI to analyze the data
+    let promptContent = "";
+    
+    // If user uploaded a codeframe, include it in the prompt
+    if (userUploadedCodeframe) {
+      promptContent = `I have a survey with the following open-ended questions and responses:
+      ${JSON.stringify(selectedColumnsData, null, 2)}
+      
+      I already have a predefined codeframe that I want you to use to code these responses:
+      ${JSON.stringify(userUploadedCodeframe.entries, null, 2)}
+      
+      Please analyze these responses and:
+      1. Use ONLY the provided codeframe codes - do not create new ones
+      2. Assign the appropriate codes to each response based on the definitions in the codeframe
+      3. Make sure to include the "Other" category for responses that don't fit any category
+      
+      Format your response as a JSON object with two properties:
+      - codeframe: The provided codeframe array of code objects with {code, numeric, label, definition, examples}
+      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
+    } else {
+      // Otherwise use the default prompt to generate a new codeframe
+      promptContent = `I have a survey with the following open-ended questions and responses:
+      ${JSON.stringify(selectedColumnsData, null, 2)}
+      
+      Please analyze these responses and:
+      1. Create a codeframe with 5-8 distinct codes using numeric identifiers
+      2. Always include an "Other" category for responses that don't clearly fit other categories
+      3. For each code, provide:
+         - A short label
+         - A clear definition
+         - A numeric code (e.g., 1, 2, 3 or 1.1, 1.2, etc.)
+         - 2-3 example phrases
+      4. Assign appropriate codes to each response
+      
+      Format your response as a JSON object with two properties:
+      - codeframe: An array of code objects with {code, numeric, label, definition, examples}
+      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
+    }
+    
     const messages = [
       {
         role: "system",
-        content: `You are an expert qualitative researcher analyzing open-ended survey responses. 
-        Your task is to create a codeframe (a set of themes/codes) based on the survey responses provided,
-        and then code each response according to that codeframe.`
+        content: `You are an expert qualitative researcher analyzing open-ended survey responses.`
       },
       {
         role: "user",
-        content: `I have a survey with the following open-ended questions and responses:
-        ${JSON.stringify(selectedColumnsData, null, 2)}
-        
-        Please analyze these responses and:
-        1. Create a codeframe with 5-8 distinct codes
-        2. For each code, provide:
-           - A short label
-           - A clear definition
-           - 2-3 example phrases
-        3. Assign appropriate codes to each response
-        
-        Format your response as a JSON object with two properties:
-        - codeframe: An array of code objects with {code, label, definition, examples}
-        - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}
-
-        IMPORTANT: Format your entire response as valid JSON. Don't include any text outside the JSON structure.`
+        content: promptContent
       }
     ];
     
@@ -233,12 +326,22 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         return mockGetProcessingResult(fileId);
       }
       
+      // Ensure codeframe has numeric codes
+      const codeframeWithNumeric = ensureNumericCodes(parsedResult.codeframe);
+      
+      // Calculate code percentages
+      const { updatedCodeframe, codeSummary } = calculateCodePercentages(
+        parsedResult.codedResponses, 
+        codeframeWithNumeric
+      );
+      
       // Return the processed result
       return {
         success: true,
         data: {
-          codeframe: parsedResult.codeframe,
+          codeframe: updatedCodeframe,
           codedResponses: parsedResult.codedResponses,
+          codeSummary: codeSummary,
           status: 'complete'
         }
       };
@@ -264,35 +367,68 @@ const mockGetProcessingResult = async (fileId: string): Promise<ApiResponse<Proc
   const mockCodeframe = [
     {
       code: "C01",
+      numeric: "1",
       label: "Ease of Use",
       definition: "Comments related to how easy or difficult the product is to use",
-      examples: ["Very intuitive interface", "Easy to navigate", "Straightforward to set up"]
+      examples: ["Very intuitive interface", "Easy to navigate", "Straightforward to set up"],
+      count: 8,
+      percentage: 32
     },
     {
       code: "C02",
+      numeric: "2",
       label: "Performance",
       definition: "Comments about the speed, reliability, or efficiency of the product",
-      examples: ["Runs smoothly", "No lag time", "Quick response"]
+      examples: ["Runs smoothly", "No lag time", "Quick response"],
+      count: 6,
+      percentage: 24
     },
     {
       code: "C03",
+      numeric: "3",
       label: "Features",
       definition: "Mentions of specific product features or functionality",
-      examples: ["Love the search capability", "The dashboard is comprehensive", "Export feature saves time"]
+      examples: ["Love the search capability", "The dashboard is comprehensive", "Export feature saves time"],
+      count: 5,
+      percentage: 20
     },
     {
       code: "C04",
+      numeric: "4", 
       label: "Value",
       definition: "Comments about price, ROI, or overall value proposition",
-      examples: ["Worth every penny", "Good price for what you get", "Expensive but worth it"]
+      examples: ["Worth every penny", "Good price for what you get", "Expensive but worth it"],
+      count: 4,
+      percentage: 16
     },
     {
       code: "C05",
+      numeric: "5",
       label: "Support",
       definition: "Feedback about customer service or technical support",
-      examples: ["Support team was helpful", "Quick response to my questions", "Documentation is thorough"]
+      examples: ["Support team was helpful", "Quick response to my questions", "Documentation is thorough"],
+      count: 2,
+      percentage: 8
+    },
+    {
+      code: "C06",
+      numeric: "6",
+      label: "Other",
+      definition: "Comments that don't fit into the above categories",
+      examples: ["Packaging was neat", "Arrived on time", "Company seems ethical"],
+      count: 0,
+      percentage: 0
     }
   ];
+
+  // Generate code summary
+  const codeSummary = mockCodeframe.map(code => ({
+    code: code.code,
+    numeric: code.numeric,
+    label: code.label,
+    count: code.count || 0,
+    percentage: code.percentage || 0
+  })).sort((a, b) => b.percentage - a.percentage);
   
   // Generate mock coded responses based on user-uploaded data
   const generateMockCodedResponses = () => {
@@ -394,6 +530,7 @@ const mockGetProcessingResult = async (fileId: string): Promise<ApiResponse<Proc
     data: {
       codeframe: mockCodeframe,
       codedResponses: generateMockCodedResponses(),
+      codeSummary: codeSummary,
       status: 'complete'
     }
   };
@@ -408,18 +545,38 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
     // Create the Codeframe worksheet
     const codeframeData = result.codeframe.map(code => ({
       Code: code.code,
+      Numeric: code.numeric || '',
       Label: code.label,
       Definition: code.definition,
-      Examples: code.examples.join('; ')
+      Examples: code.examples.join('; '),
+      Count: code.count || 0,
+      Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%'
     }));
     const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
     XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, "Codeframe");
+    
+    // Create the Code Summary worksheet
+    if (result.codeSummary) {
+      const summaryData = result.codeSummary.map(code => ({
+        Code: code.code,
+        Numeric: code.numeric || '',
+        Label: code.label,
+        Count: code.count,
+        Percentage: `${code.percentage.toFixed(1)}%`
+      }));
+      const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Code Summary");
+    }
     
     // Create the Coded Responses worksheet
     const responsesData = result.codedResponses.map(response => ({
       Response: response.responseText,
       Column: response.columnName || 'Unknown',
-      Codes: response.codesAssigned.join('; ')
+      Codes: response.codesAssigned.join('; '),
+      NumericCodes: response.codesAssigned.map(code => {
+        const codeEntry = result.codeframe.find(c => c.code === code);
+        return codeEntry ? codeEntry.numeric || code : code;
+      }).join('; ')
     }));
     const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
     XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
@@ -436,7 +593,10 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
         }
         columnResponses.get(key)?.push({
           Response: response.responseText,
-          Codes: response.codesAssigned.join('; ')
+          Codes: response.codesAssigned.map(code => {
+            const codeEntry = result.codeframe.find(c => c.code === code);
+            return codeEntry ? `${codeEntry.numeric || ''} - ${codeEntry.label}` : code;
+          }).join('; ')
         });
       }
     });
@@ -458,5 +618,115 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
   } catch (error) {
     console.error("Error generating Excel file:", error);
     throw new Error('Failed to generate Excel file');
+  }
+};
+
+// Function to generate Excel with original data and codes
+export const generateExcelWithOriginalData = async (result: ProcessedResult, rawFileData: any[][]): Promise<Blob> => {
+  try {
+    // Create a new workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // Create the Codeframe worksheet (same as regular export)
+    const codeframeData = result.codeframe.map(code => ({
+      Code: code.code,
+      Numeric: code.numeric || '',
+      Label: code.label,
+      Definition: code.definition,
+      Examples: code.examples.join('; '),
+      Count: code.count || 0,
+      Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%'
+    }));
+    const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
+    XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, "Codeframe");
+    
+    // Create the Code Summary worksheet
+    if (result.codeSummary) {
+      const summaryData = result.codeSummary.map(code => ({
+        Code: code.code,
+        Numeric: code.numeric || '',
+        Label: code.label,
+        Count: code.count,
+        Percentage: `${code.percentage.toFixed(1)}%`
+      }));
+      const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Code Summary");
+    }
+    
+    // Create a map of response texts to assigned codes for quick lookup
+    const responseToCodesMap = new Map();
+    result.codedResponses.forEach(response => {
+      responseToCodesMap.set(
+        response.responseText,
+        response.codesAssigned.map(code => {
+          const codeEntry = result.codeframe.find(c => c.code === code);
+          return codeEntry ? `${codeEntry.numeric || ''} - ${codeEntry.label}` : code;
+        }).join('; ')
+      );
+    });
+    
+    // Create the Coded Responses worksheet (same as regular export)
+    const responsesData = result.codedResponses.map(response => ({
+      Response: response.responseText,
+      Column: response.columnName || 'Unknown',
+      Codes: response.codesAssigned.join('; '),
+      NumericCodes: response.codesAssigned.map(code => {
+        const codeEntry = result.codeframe.find(c => c.code === code);
+        return codeEntry ? codeEntry.numeric || code : code;
+      }).join('; ')
+    }));
+    const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
+    XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
+    
+    // Create the Original Data with Codes worksheet
+    if (rawFileData && rawFileData.length > 0) {
+      // Create a new sheet for original data
+      const originalWorksheet = XLSX.utils.aoa_to_sheet(rawFileData);
+      
+      // Add an additional header for the codes column
+      const lastCol = XLSX.utils.decode_col(originalWorksheet['!ref']?.split(':')[1].replace(/\d+/, '') || 'A');
+      const codeCol = XLSX.utils.encode_col(lastCol + 1);
+      
+      // Add "Assigned Codes" header in the next column after the last column
+      XLSX.utils.sheet_add_aoa(originalWorksheet, [['Assigned Codes']], {
+        origin: `${codeCol}1`
+      });
+      
+      // Map responses to codes in the original data
+      for (let row = 1; row < rawFileData.length; row++) {
+        for (let col = 0; col < rawFileData[row].length; col++) {
+          const cellValue = rawFileData[row][col];
+          if (cellValue && typeof cellValue === 'string') {
+            const assignedCodes = responseToCodesMap.get(cellValue);
+            if (assignedCodes) {
+              // Add the codes in the new column
+              XLSX.utils.sheet_add_aoa(originalWorksheet, [[assignedCodes]], {
+                origin: `${codeCol}${row + 1}`
+              });
+            }
+          }
+        }
+      }
+      
+      // Update the sheet range to include the new column
+      const newLastCol = XLSX.utils.encode_col(lastCol + 1);
+      const oldRef = originalWorksheet['!ref'] || '';
+      const newRef = oldRef.replace(/:[A-Z]+/, `:${newLastCol}`);
+      originalWorksheet['!ref'] = newRef;
+      
+      // Add the original data sheet to the workbook
+      XLSX.utils.book_append_sheet(workbook, originalWorksheet, "Original Data with Codes");
+    }
+    
+    // Write the workbook to an array buffer
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    
+    // Create a Blob from the ArrayBuffer with the correct MIME type
+    return new Blob([excelBuffer], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    });
+  } catch (error) {
+    console.error("Error generating Excel file with original data:", error);
+    throw new Error('Failed to generate Excel file with original data');
   }
 };

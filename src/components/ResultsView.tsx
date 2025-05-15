@@ -4,17 +4,19 @@ import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { Loader2, Download, RefreshCw, Filter, AlertCircle } from 'lucide-react';
+import { Loader2, Download, RefreshCw, Filter, AlertCircle, BarChart } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { ColumnInfo } from '../types';
+import CodeSummaryChart from './CodeSummary';
 
 const ResultsView: React.FC = () => {
-  const { results, isGeneratingExcel, downloadResults, resetState, fileColumns, apiConfig } = useProcessing();
+  const { results, isGeneratingExcel, downloadResults, downloadOriginalWithCodes, resetState, fileColumns, apiConfig } = useProcessing();
   const [searchFilter, setSearchFilter] = useState('');
   const [columnFilter, setColumnFilter] = useState<string>('all');
+  const [exportOption, setExportOption] = useState<'coded' | 'original'>('coded');
   
   if (!results) {
     return null;
@@ -43,11 +45,26 @@ const ResultsView: React.FC = () => {
     
     return matchesSearch && matchesColumn;
   });
+
+  // Handle export based on selected option
+  const handleExport = () => {
+    if (exportOption === 'original') {
+      downloadOriginalWithCodes();
+    } else {
+      downloadResults();
+    }
+  };
   
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Analysis Results</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          Analysis Results
+          <Badge variant="outline" className="flex items-center gap-1">
+            <BarChart className="h-4 w-4" />
+            {results.codedResponses.length} Responses Coded
+          </Badge>
+        </CardTitle>
         {!apiConfig?.isConfigured && (
           <Alert variant="warning" className="mt-2 border-orange-300 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
             <AlertCircle className="h-4 w-4 text-orange-500" />
@@ -59,6 +76,11 @@ const ResultsView: React.FC = () => {
         )}
       </CardHeader>
       <CardContent>
+        {/* Add Code Summary Chart if we have code summary data */}
+        {results.codeSummary && results.codeSummary.length > 0 && (
+          <CodeSummaryChart codeSummary={results.codeSummary} />
+        )}
+      
         <Tabs defaultValue="codeframe">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="codeframe">Codeframe</TabsTrigger>
@@ -71,15 +93,19 @@ const ResultsView: React.FC = () => {
                 <thead>
                   <tr>
                     <th>Code</th>
+                    <th>Numeric</th>
                     <th>Label</th>
                     <th>Definition</th>
                     <th>Examples</th>
+                    <th>Count</th>
+                    <th>%</th>
                   </tr>
                 </thead>
                 <tbody>
                   {results.codeframe.map(entry => (
                     <tr key={entry.code}>
                       <td className="font-medium">{entry.code}</td>
+                      <td>{entry.numeric || '-'}</td>
                       <td>{entry.label}</td>
                       <td>{entry.definition}</td>
                       <td>
@@ -94,8 +120,22 @@ const ResultsView: React.FC = () => {
                           )}
                         </ul>
                       </td>
+                      <td className="text-center">{entry.count || 0}</td>
+                      <td className="text-center">{entry.percentage ? `${entry.percentage.toFixed(1)}%` : '0%'}</td>
                     </tr>
                   ))}
+                  {/* Add "Other" category if not already present */}
+                  {!results.codeframe.some(code => code.code === "Other") && (
+                    <tr>
+                      <td className="font-medium">Other</td>
+                      <td>0</td>
+                      <td>Other responses</td>
+                      <td>Responses that don't fit into the main categories</td>
+                      <td>-</td>
+                      <td className="text-center">0</td>
+                      <td className="text-center">0%</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -157,14 +197,19 @@ const ResultsView: React.FC = () => {
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-1">
-                          {response.codesAssigned.map(code => (
-                            <span 
-                              key={code} 
-                              className="bg-primary/10 text-primary text-xs rounded px-2 py-0.5"
-                            >
-                              {code}
-                            </span>
-                          ))}
+                          {response.codesAssigned.map(code => {
+                            // Find the full code entry to get the numeric code
+                            const codeEntry = results.codeframe.find(c => c.code === code);
+                            return (
+                              <span 
+                                key={code} 
+                                className="bg-primary/10 text-primary text-xs rounded px-2 py-0.5"
+                                title={codeEntry?.label || code}
+                              >
+                                {codeEntry?.numeric || code}
+                              </span>
+                            );
+                          })}
                         </div>
                       </td>
                     </tr>
@@ -187,23 +232,38 @@ const ResultsView: React.FC = () => {
           <span>Start New Analysis</span>
         </Button>
         
-        <Button 
-          onClick={downloadResults}
-          disabled={isGeneratingExcel}
-          className="space-x-2"
-        >
-          {isGeneratingExcel ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Generating...</span>
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              <span>Download Excel</span>
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Select
+            value={exportOption}
+            onValueChange={(value) => setExportOption(value as 'coded' | 'original')}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select export type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="coded">Coded responses only</SelectItem>
+              <SelectItem value="original">Original data with codes</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Button 
+            onClick={handleExport}
+            disabled={isGeneratingExcel}
+            className="space-x-2"
+          >
+            {isGeneratingExcel ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                <span>Download Excel</span>
+              </>
+            )}
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );
