@@ -1,13 +1,10 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { FileText, FileCode, Table, CheckSquare } from 'lucide-react';
-
 const IntroCard: React.FC = () => {
-  return (
-    <Card className="w-full">
+  return <Card className="w-full">
       <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white">
-        <CardTitle className="text-2xl">Welcome to Verbatim Coder</CardTitle>
+        <CardTitle className="text-2xl">Welcome to monigle codify</CardTitle>
         <CardDescription className="text-white/90">
           AI-Powered Analysis for Open-Ended Survey Responses
         </CardDescription>
@@ -67,8 +64,6 @@ const IntroCard: React.FC = () => {
           </div>
         </div>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 };
-
 export default IntroCard;

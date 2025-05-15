@@ -36,9 +36,7 @@ const Layout: React.FC<LayoutProps> = ({
       <header className="bg-white/80 backdrop-blur-sm shadow-sm py-4 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center text-white font-bold">
-              V
-            </div>
+            
             <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">monigle codify</h1>
           </div>
           <div className="flex items-center gap-4">
