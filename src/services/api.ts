@@ -178,8 +178,15 @@ const ensureNumericCodes = (codeframe: any[]) => {
   
   // If not, generate numeric codes
   return codeframe.map((code, index) => {
-    // Extract numeric part if code already has a number format like "C01"
-    const numericPart = code.code.replace(/[^0-9.]/g, '');
+    // Make sure code.code exists and is a string before using replace
+    let numericPart = '';
+    
+    if (code && typeof code.code === 'string') {
+      // Extract numeric part if code already has a number format like "C01"
+      numericPart = code.code.replace(/[^0-9.]/g, '');
+    }
+    
+    // If no numeric part found, use the index + 1
     const numeric = numericPart.length > 0 ? numericPart : (index + 1).toString();
     
     return {

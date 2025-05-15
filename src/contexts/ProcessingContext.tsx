@@ -212,8 +212,18 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
           // Extract data rows (skip header if it exists)
           const dataRows = hasHeaders ? jsonData.slice(1) : jsonData;
           
-          // Store raw file data for later use
-          const rawData = hasHeaders ? [jsonData[0], ...dataRows] : jsonData;
+          // Store raw file data for later use - ensure rawData is an array of arrays
+          const rawData: any[][] = [];
+          if (hasHeaders && Array.isArray(jsonData[0])) {
+            rawData.push(jsonData[0]);
+          }
+          if (Array.isArray(dataRows)) {
+            dataRows.forEach(row => {
+              if (Array.isArray(row)) {
+                rawData.push(row);
+              }
+            });
+          }
           
           // Transpose the data to get column-oriented arrays
           const columnCount = Math.max(...dataRows.map((row: any) => 
@@ -330,8 +340,15 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
               return;
             }
             
-            // Store raw file data for later use
-            const rawData = [...results.data];
+            // Store raw file data for later use - ensure it's an array of arrays
+            const rawData: any[][] = [];
+            if (Array.isArray(results.data)) {
+              results.data.forEach(row => {
+                if (Array.isArray(row)) {
+                  rawData.push(row);
+                }
+              });
+            }
             
             // Check if the first row looks like headers
             const firstRow = results.data[0] as any[];
