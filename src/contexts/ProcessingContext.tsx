@@ -29,6 +29,7 @@ interface ProcessingContextType {
   selectedColumns: number[];
   searchQuery: string;
   uploadedCodeframes: UploadedCodeframe[];
+  uploadedCodeframe: UploadedCodeframe | null;
   activeCodeframe: UploadedCodeframe | null;
   rawFileData: any[][] | null;
   setApiConfig: (config: ApiConfig) => void;
@@ -784,6 +785,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     selectedColumns,
     searchQuery,
     uploadedCodeframes,
+    uploadedCodeframe: activeCodeframe,
     activeCodeframe,
     rawFileData,
     setApiConfig,
