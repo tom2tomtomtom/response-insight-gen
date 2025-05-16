@@ -19,7 +19,7 @@ const ColumnSelector: React.FC = () => {
     uploadedFile, 
     searchQuery,
     setSearchQuery,
-    uploadedCodeframe
+    activeCodeframe // Use activeCodeframe directly instead of uploadedCodeframe
   } = useProcessing();
   
   if (!uploadedFile || fileColumns.length === 0) {
@@ -66,12 +66,12 @@ const ColumnSelector: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {uploadedCodeframe && (
+        {activeCodeframe && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
             <div className="flex items-center gap-2">
               <FileCode className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium">Using uploaded codeframe: {uploadedCodeframe.name}</span>
-              <Badge variant="outline" className="ml-auto">{uploadedCodeframe.entries.length} codes</Badge>
+              <span className="text-sm font-medium">Using uploaded codeframe: {activeCodeframe.name}</span>
+              <Badge variant="outline" className="ml-auto">{activeCodeframe.entries.length} codes</Badge>
             </div>
           </div>
         )}
@@ -141,7 +141,7 @@ const ColumnSelector: React.FC = () => {
             <span>{selectedCount} column{selectedCount !== 1 ? 's' : ''} selected</span>
           </div>
           
-          {!uploadedCodeframe && (
+          {!activeCodeframe && (
             <Button variant="outline" size="sm" asChild>
               <Link to="/upload-codeframe" className="flex items-center gap-2">
                 <FileCode className="h-4 w-4" />
