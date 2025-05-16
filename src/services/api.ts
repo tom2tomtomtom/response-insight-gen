@@ -661,6 +661,10 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
   try {
     console.log("Generating Excel with original data. Raw data rows:", rawFileData?.length);
     
+    if (!rawFileData || !Array.isArray(rawFileData) || rawFileData.length === 0) {
+      throw new Error("No raw file data available for export");
+    }
+    
     // Create a new workbook
     const workbook = XLSX.utils.book_new();
     
@@ -704,84 +708,119 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
     XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
     
     // Handle the Original Data with Codes worksheet
-    if (rawFileData && rawFileData.length > 0) {
-      try {
-        // Create a map of response texts to their assigned codes for easy lookup
-        const responseCodeMap = new Map();
-        result.codedResponses.forEach(response => {
-          // Get numeric codes
-          const codeString = response.codesAssigned.map(code => {
-            const codeEntry = result.codeframe.find(c => c.code === code);
-            return codeEntry ? codeEntry.numeric || code : code;
-          }).join('; ');
-          
-          // Get code labels
-          const labelString = response.codesAssigned.map(code => {
-            const codeEntry = result.codeframe.find(c => c.code === code);
-            return codeEntry ? codeEntry.label : code;
-          }).join('; ');
-          
-          // Store both numeric codes and code labels
-          responseCodeMap.set(response.responseText.trim().toLowerCase(), {
-            codes: codeString,
-            labels: labelString
-          });
+    try {
+      console.log("Creating original data worksheet with", rawFileData.length, "rows");
+      
+      // Create a map of normalized response texts to their assigned codes for easy lookup
+      const responseCodeMap = new Map();
+      result.codedResponses.forEach(response => {
+        // Get numeric codes
+        const codeString = response.codesAssigned.map(code => {
+          const codeEntry = result.codeframe.find(c => c.code === code);
+          return codeEntry ? codeEntry.numeric || code : code;
+        }).join('; ');
+        
+        // Get code labels
+        const labelString = response.codesAssigned.map(code => {
+          const codeEntry = result.codeframe.find(c => c.code === code);
+          return codeEntry ? codeEntry.label : code;
+        }).join('; ');
+        
+        // Store both numeric codes and code labels with normalized key for case-insensitive matching
+        const normalizedKey = response.responseText.trim().toLowerCase();
+        responseCodeMap.set(normalizedKey, {
+          codes: codeString,
+          labels: labelString
         });
-        
-        // Copy the raw data to a new array that we'll modify
-        const originalWithCodes = [];
-        
-        // First row is headers - copy and add additional headers
-        if (rawFileData[0]) {
-          const headers = [...rawFileData[0], "Assigned Codes", "Code Labels"];
-          originalWithCodes.push(headers);
-        }
-        
-        // Process each data row
-        for (let rowIndex = 1; rowIndex < rawFileData.length; rowIndex++) {
-          const row = rawFileData[rowIndex];
-          if (!row) continue;
-          
-          const newRow = [...row];
-          let foundCodes = false;
-          
-          // Look for coded responses in this row
-          for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
-            const cellValue = row[cellIndex];
-            
-            // Skip empty or non-string values
-            if (!cellValue || typeof cellValue !== 'string') continue;
-            
-            // Look for the cell text in our coded responses
-            const normalizedText = cellValue.trim().toLowerCase();
-            const codeInfo = responseCodeMap.get(normalizedText);
-            
-            if (codeInfo) {
-              newRow.push(codeInfo.codes);
-              newRow.push(codeInfo.labels);
-              foundCodes = true;
-              break;
-            }
+      });
+      
+      // Create a defensive copy of the raw data to avoid modification issues
+      let originalWithCodes;
+      try {
+        originalWithCodes = JSON.parse(JSON.stringify(rawFileData));
+        console.log("Successfully created deep copy of raw data");
+      } catch (copyError) {
+        console.error("Error creating deep copy, falling back to manual copy:", copyError);
+        // Fallback to manual array copy if JSON stringify/parse fails
+        originalWithCodes = [];
+        for (let i = 0; i < rawFileData.length; i++) {
+          if (Array.isArray(rawFileData[i])) {
+            originalWithCodes.push([...rawFileData[i]]);
+          } else {
+            originalWithCodes.push([]);
           }
-          
-          // If no codes were found, add empty cells
-          if (!foundCodes) {
-            newRow.push("");
-            newRow.push("");
-          }
-          
-          originalWithCodes.push(newRow);
         }
-        
-        // Convert the augmented data to a worksheet
-        const originalWorksheet = XLSX.utils.aoa_to_sheet(originalWithCodes);
-        XLSX.utils.book_append_sheet(workbook, originalWorksheet, "Original Data with Codes");
-        
-      } catch (sheetError) {
-        console.error("Error processing original data sheet:", sheetError);
-        // Continue with the rest of the export even if this sheet fails
       }
+      
+      // First row is headers - copy and add additional headers
+      if (originalWithCodes.length > 0) {
+        if (!Array.isArray(originalWithCodes[0])) {
+          originalWithCodes[0] = [];
+        }
+        originalWithCodes[0].push("Assigned Codes");
+        originalWithCodes[0].push("Code Labels");
+      }
+      
+      // Process each data row
+      for (let rowIndex = 1; rowIndex < originalWithCodes.length; rowIndex++) {
+        const row = originalWithCodes[rowIndex];
+        if (!row || !Array.isArray(row)) {
+          originalWithCodes[rowIndex] = ["", ""];
+          continue;
+        }
+        
+        let foundCodes = false;
+        
+        // Look for coded responses in this row
+        for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
+          const cellValue = row[cellIndex];
+          
+          // Skip empty or non-string values
+          if (!cellValue) continue;
+          
+          // Convert to string if it's not already
+          const cellText = String(cellValue).trim();
+          if (cellText.length === 0) continue;
+          
+          // Look for the normalized cell text in our coded responses map
+          const normalizedText = cellText.toLowerCase();
+          const codeInfo = responseCodeMap.get(normalizedText);
+          
+          if (codeInfo) {
+            row.push(codeInfo.codes || "");
+            row.push(codeInfo.labels || "");
+            foundCodes = true;
+            break;
+          }
+        }
+        
+        // If no codes were found, add empty cells
+        if (!foundCodes) {
+          row.push("");
+          row.push("");
+        }
+      }
+      
+      // Convert the augmented data to a worksheet
+      console.log("Creating worksheet from processed data");
+      const originalWorksheet = XLSX.utils.aoa_to_sheet(originalWithCodes);
+      XLSX.utils.book_append_sheet(workbook, originalWorksheet, "Original Data with Codes");
+      console.log("Successfully added original data worksheet");
+    } catch (sheetError) {
+      console.error("Error processing original data sheet:", sheetError);
+      // Create a simple error explanation sheet instead
+      const errorData = [
+        ["Error Processing Original Data"],
+        ["An error occurred while trying to merge your original data with the codes."],
+        ["Your coded responses are still available in the other sheets."],
+        ["Error details:"],
+        [sheetError instanceof Error ? sheetError.message : String(sheetError)]
+      ];
+      const errorWorksheet = XLSX.utils.aoa_to_sheet(errorData);
+      XLSX.utils.book_append_sheet(workbook, errorWorksheet, "Data Processing Error");
     }
+    
+    console.log("Writing workbook to Excel buffer");
     
     // Write the workbook to an array buffer
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -792,6 +831,9 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
     });
   } catch (error) {
     console.error("Error generating Excel file with original data:", error);
-    throw new Error('Failed to generate Excel file with original data');
+    throw new Error(error instanceof Error ? 
+      `Failed to generate Excel file: ${error.message}` : 
+      'Failed to generate Excel file with original data'
+    );
   }
 };

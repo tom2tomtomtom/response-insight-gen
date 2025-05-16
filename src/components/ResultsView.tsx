@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
@@ -68,10 +69,18 @@ const ResultsView: React.FC = () => {
       });
       
       if (exportOption === 'original') {
-        // Make sure raw file data is available
+        // Check if raw file data is available
         if (!rawFileData || rawFileData.length === 0) {
           throw new Error("Original data not available for export");
         }
+        
+        // Add more detailed logging and validation
+        console.log("Starting original data export", {
+          rawFileDataLength: rawFileData.length,
+          resultsAvailable: !!results,
+          codedResponsesCount: results?.codedResponses?.length || 0
+        });
+        
         await downloadOriginalWithCodes();
       } else {
         await downloadResults();
@@ -91,8 +100,9 @@ const ResultsView: React.FC = () => {
     }
   };
   
-  // Check if original data export is available
-  const originalExportAvailable = rawFileData && rawFileData.length > 0;
+  // More robust check for original data export availability
+  const hasRawFileData = rawFileData && Array.isArray(rawFileData) && rawFileData.length > 0;
+  const originalExportAvailable = hasRawFileData;
   
   return (
     <Card className="w-full">
