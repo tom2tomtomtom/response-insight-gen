@@ -6,7 +6,6 @@ import {
   processFile, 
   getProcessingResult, 
   generateExcelFile,
-  generateExcelWithOriginalData,
   testApiConnection, 
   setUserResponses,
   setApiSelectedColumns,
@@ -37,7 +36,6 @@ interface ProcessingContextType {
   handleFileUpload: (file: File) => Promise<void>;
   startProcessing: () => Promise<void>;
   downloadResults: () => Promise<void>;
-  downloadOriginalWithCodes: () => Promise<void>;
   resetState: () => void;
   toggleColumnSelection: (columnIndex: number) => void;
   setSearchQuery: (query: string) => void;
@@ -712,48 +710,6 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  // Generate and download Excel file with original data and codes
-  const downloadOriginalWithCodes = async () => {
-    if (!results || !rawFileData) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No results or original data available to download",
-      });
-      return;
-    }
-
-    try {
-      setIsGeneratingExcel(true);
-      setProcessingStatus('Generating Excel with original data...');
-      
-      const excelBlob = await generateExcelWithOriginalData(results, rawFileData);
-      
-      // Create a download link and trigger it
-      const url = URL.createObjectURL(excelBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'survey_with_codes.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Download Started",
-        description: "Your Excel file with original data and codes is being downloaded",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Download Failed",
-        description: error instanceof Error ? error.message : "An error occurred while generating the Excel file",
-      });
-    } finally {
-      setIsGeneratingExcel(false);
-    }
-  };
-
   // Reset the entire state
   const resetState = () => {
     setUploadedFile(null);
@@ -793,7 +749,6 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     handleFileUpload,
     startProcessing,
     downloadResults,
-    downloadOriginalWithCodes,
     resetState,
     toggleColumnSelection,
     setSearchQuery,

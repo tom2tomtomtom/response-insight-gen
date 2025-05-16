@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
@@ -17,7 +18,6 @@ const ResultsView: React.FC = () => {
     results, 
     isGeneratingExcel, 
     downloadResults, 
-    downloadOriginalWithCodes, 
     resetState, 
     fileColumns, 
     apiConfig,
@@ -25,34 +25,6 @@ const ResultsView: React.FC = () => {
   } = useProcessing();
   const [searchFilter, setSearchFilter] = useState('');
   const [columnFilter, setColumnFilter] = useState<string>('all');
-  const [exportOption, setExportOption] = useState<'coded' | 'original'>('coded');
-  const [rawDataInfo, setRawDataInfo] = useState<{rows: number, size: string} | null>(null);
-  
-  // Calculate and set raw data stats
-  useEffect(() => {
-    if (rawFileData && Array.isArray(rawFileData)) {
-      try {
-        // Count rows
-        const rows = rawFileData.length;
-        
-        // Simple size estimation based on row count and average row size
-        const avgRowSizeBytes = 200; // Conservative estimate
-        const estimatedSize = rows * avgRowSizeBytes;
-        
-        // Format size in KB or MB
-        let sizeString: string;
-        if (estimatedSize > 1048576) {
-          sizeString = `~${(estimatedSize / 1048576).toFixed(1)} MB`;
-        } else {
-          sizeString = `~${(estimatedSize / 1024).toFixed(0)} KB`;
-        }
-        
-        setRawDataInfo({ rows, size: sizeString });
-      } catch (error) {
-        console.error("Error calculating raw data stats:", error);
-      }
-    }
-  }, [rawFileData]);
   
   if (!results) {
     return null;
@@ -89,54 +61,12 @@ const ResultsView: React.FC = () => {
     }
     
     try {
-      // Validate before export - especially important for original data
-      if (exportOption === 'original') {
-        if (!rawFileData || !Array.isArray(rawFileData) || rawFileData.length === 0) {
-          throw new Error("Original data not available for export. Please try the 'Coded responses only' option.");
-        }
-        
-        // Show file size warning for large files
-        if (rawFileData.length > 5000) {
-          const warningText = `You're exporting a large file (${rawDataInfo?.rows.toLocaleString()} rows, ${rawDataInfo?.size}). This may take a while.`;
-          
-          toast({
-            title: "Large File Warning",
-            description: warningText,
-            duration: 6000,
-          });
-        }
-        
-        // Additional warning for extremely large files
-        if (rawFileData.length > 20000) {
-          toast({
-            variant: "destructive",  
-            title: "Very Large File Warning",
-            description: "Your file is extremely large and may cause issues. Consider using 'Coded responses only' option instead.",
-            duration: 8000,
-          });
-        }
-        
-        toast({
-          title: "Generating Excel File",
-          description: "Please wait while we prepare your download with original data...",
-        });
-        
-        console.log("Starting original data export", {
-          rawFileDataLength: rawFileData.length,
-          resultsAvailable: !!results,
-          codedResponsesCount: results?.codedResponses?.length || 0
-        });
-        
-        await downloadOriginalWithCodes();
-      } else {
-        // Standard export - simpler
-        toast({
-          title: "Generating Excel File",
-          description: "Please wait while we prepare your download...",
-        });
-        
-        await downloadResults();
-      }
+      toast({
+        title: "Generating Excel File",
+        description: "Please wait while we prepare your download...",
+      });
+      
+      await downloadResults();
       
       toast({
         title: "Download Complete",
@@ -145,24 +75,16 @@ const ResultsView: React.FC = () => {
     } catch (error) {
       console.error("Export failed:", error);
       
-      // More helpful error message
       toast({
         variant: "destructive",
         title: "Download Failed",
         description: error instanceof Error 
           ? error.message 
-          : "There was an error generating the Excel file. Please try with 'Coded responses only' option.",
+          : "There was an error generating the Excel file.",
         duration: 10000,
       });
     }
   };
-  
-  // More robust check for original data export availability
-  const hasRawFileData = rawFileData && Array.isArray(rawFileData) && rawFileData.length > 0;
-  const originalExportAvailable = hasRawFileData;
-  
-  // Flag for very large datasets
-  const isLargeDataset = rawFileData && Array.isArray(rawFileData) && rawFileData.length > 10000;
   
   return (
     <Card className="w-full">
@@ -341,53 +263,23 @@ const ResultsView: React.FC = () => {
           <span>Start New Analysis</span>
         </Button>
         
-        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-          <Select
-            value={exportOption}
-            onValueChange={(value) => setExportOption(value as 'coded' | 'original')}
-          >
-            <SelectTrigger className="w-full md:w-[220px]">
-              <SelectValue placeholder="Select export type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="coded">Coded responses only</SelectItem>
-              <SelectItem value="original" disabled={!originalExportAvailable}>
-                Original data with codes
-                {!originalExportAvailable && " (unavailable)"}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {/* Warning for large dataset export */}
-          {isLargeDataset && exportOption === 'original' && (
-            <Alert variant="warning" className="mt-2 mb-2 p-2 text-sm">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="text-sm">Large Dataset Warning</AlertTitle>
-              <AlertDescription className="text-xs">
-                You're exporting a large file ({rawDataInfo?.rows.toLocaleString()} rows, {rawDataInfo?.size}). 
-                This may cause performance issues.
-              </AlertDescription>
-            </Alert>
+        <Button 
+          onClick={handleExport}
+          disabled={isGeneratingExcel}
+          className="space-x-2 w-full md:w-auto"
+        >
+          {isGeneratingExcel ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4" />
+              <span>Download Excel</span>
+            </>
           )}
-          
-          <Button 
-            onClick={handleExport}
-            disabled={isGeneratingExcel || (exportOption === 'original' && !originalExportAvailable)}
-            className="space-x-2 w-full md:w-auto"
-          >
-            {isGeneratingExcel ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Generating...</span>
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4" />
-                <span>Download Excel</span>
-              </>
-            )}
-          </Button>
-        </div>
+        </Button>
       </CardFooter>
     </Card>
   );
