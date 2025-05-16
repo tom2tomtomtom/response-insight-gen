@@ -13,6 +13,9 @@ import ApiKeyConfig from '../components/ApiKeyConfig';
 import ColumnSelector from '../components/ColumnSelector';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
+import { Link } from "react-router-dom";
+import { Button } from "../components/ui/button";
+import { FileCode } from "lucide-react";
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {
@@ -29,7 +32,19 @@ const IndexContent: React.FC = () => {
       
       {/* Only show the rest of the content if API is configured or if we're just in demo mode */}
       <div className={`${!apiConfig?.isConfigured ? 'opacity-50 pointer-events-none' : ''}`}>
-        {!uploadedFile && <IntroCard />}
+        {!uploadedFile && (
+          <>
+            <IntroCard />
+            <div className="flex justify-end mb-4">
+              <Button variant="outline" asChild className="flex items-center gap-2">
+                <Link to="/upload-codeframe">
+                  <FileCode className="h-4 w-4" />
+                  <span>Upload Existing Codeframe</span>
+                </Link>
+              </Button>
+            </div>
+          </>
+        )}
         
         <WorkflowSteps />
         

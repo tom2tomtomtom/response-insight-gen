@@ -196,6 +196,31 @@ const ensureNumericCodes = (codeframe: any[]) => {
   });
 };
 
+// Make sure "Other" category exists in the codeframe
+const ensureOtherCategory = (codeframe: any[]) => {
+  // Check if Other category already exists
+  const otherExists = codeframe.some(code => 
+    code.code === "Other" || 
+    code.label === "Other" || 
+    code.label.toLowerCase().includes("other")
+  );
+  
+  if (otherExists) {
+    return codeframe;
+  }
+  
+  // Add an "Other" category
+  return [...codeframe, {
+    code: "Other",
+    numeric: codeframe.length + 1,
+    label: "Other responses",
+    definition: "Responses that don't fit into the main categories",
+    examples: ["Miscellaneous response", "Unrelated comment"],
+    count: 0,
+    percentage: 0
+  }];
+};
+
 // Get the processing result
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
@@ -336,10 +361,13 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       // Ensure codeframe has numeric codes
       const codeframeWithNumeric = ensureNumericCodes(parsedResult.codeframe);
       
+      // Ensure "Other" category exists
+      const codeframeWithOther = ensureOtherCategory(codeframeWithNumeric);
+      
       // Calculate code percentages
       const { updatedCodeframe, codeSummary } = calculateCodePercentages(
         parsedResult.codedResponses, 
-        codeframeWithNumeric
+        codeframeWithOther
       );
       
       // Return the processed result

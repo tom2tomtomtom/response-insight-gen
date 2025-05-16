@@ -6,8 +6,9 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Search, Play, FileText } from 'lucide-react';
+import { Search, Play, FileText, FileCode } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
+import { Link } from 'react-router-dom';
 
 const ColumnSelector: React.FC = () => {
   const { 
@@ -17,7 +18,8 @@ const ColumnSelector: React.FC = () => {
     startProcessing, 
     uploadedFile, 
     searchQuery,
-    setSearchQuery
+    setSearchQuery,
+    uploadedCodeframe
   } = useProcessing();
   
   if (!uploadedFile || fileColumns.length === 0) {
@@ -64,6 +66,16 @@ const ColumnSelector: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent>
+        {uploadedCodeframe && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+            <div className="flex items-center gap-2">
+              <FileCode className="h-4 w-4 text-green-500" />
+              <span className="text-sm font-medium">Using uploaded codeframe: {uploadedCodeframe.name}</span>
+              <Badge variant="outline" className="ml-auto">{uploadedCodeframe.entries.length} codes</Badge>
+            </div>
+          </div>
+        )}
+        
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredColumns.length > 0 ? (
@@ -122,15 +134,27 @@ const ColumnSelector: React.FC = () => {
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between items-center border-t p-4">
-        <div className="text-sm text-muted-foreground flex items-center">
-          <FileText className="h-4 w-4 mr-2" />
-          <span>{selectedCount} column{selectedCount !== 1 ? 's' : ''} selected</span>
+      <CardFooter className="flex flex-col md:flex-row justify-between items-center border-t p-4 gap-4">
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="text-sm text-muted-foreground flex items-center">
+            <FileText className="h-4 w-4 mr-2" />
+            <span>{selectedCount} column{selectedCount !== 1 ? 's' : ''} selected</span>
+          </div>
+          
+          {!uploadedCodeframe && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/upload-codeframe" className="flex items-center gap-2">
+                <FileCode className="h-4 w-4" />
+                <span>Upload Codeframe</span>
+              </Link>
+            </Button>
+          )}
         </div>
+        
         <Button 
           onClick={startProcessing}
           disabled={selectedCount === 0} 
-          className="space-x-2"
+          className="space-x-2 w-full md:w-auto"
         >
           <Play className="h-4 w-4" />
           <span>Process Selected Columns</span>
