@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { ColumnInfo } from '../types';
 import CodeSummaryChart from './CodeSummary';
+import { toast } from './ui/use-toast';
 
 const ResultsView: React.FC = () => {
   const { results, isGeneratingExcel, downloadResults, downloadOriginalWithCodes, resetState, fileColumns, apiConfig } = useProcessing();
@@ -47,11 +48,20 @@ const ResultsView: React.FC = () => {
   });
 
   // Handle export based on selected option
-  const handleExport = () => {
-    if (exportOption === 'original') {
-      downloadOriginalWithCodes();
-    } else {
-      downloadResults();
+  const handleExport = async () => {
+    try {
+      if (exportOption === 'original') {
+        await downloadOriginalWithCodes();
+      } else {
+        await downloadResults();
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: "There was an error generating the Excel file. Please try again.",
+      });
     }
   };
   
@@ -226,18 +236,18 @@ const ResultsView: React.FC = () => {
           </TabsContent>
         </Tabs>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={resetState} className="space-x-2">
+      <CardFooter className="flex flex-col md:flex-row justify-between gap-4">
+        <Button variant="outline" onClick={resetState} className="space-x-2 w-full md:w-auto">
           <RefreshCw className="h-4 w-4" />
           <span>Start New Analysis</span>
         </Button>
         
-        <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
           <Select
             value={exportOption}
             onValueChange={(value) => setExportOption(value as 'coded' | 'original')}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="Select export type" />
             </SelectTrigger>
             <SelectContent>
@@ -249,7 +259,7 @@ const ResultsView: React.FC = () => {
           <Button 
             onClick={handleExport}
             disabled={isGeneratingExcel}
-            className="space-x-2"
+            className="space-x-2 w-full md:w-auto"
           >
             {isGeneratingExcel ? (
               <>
