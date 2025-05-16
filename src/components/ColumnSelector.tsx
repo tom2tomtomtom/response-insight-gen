@@ -19,7 +19,7 @@ const ColumnSelector: React.FC = () => {
     uploadedFile, 
     searchQuery,
     setSearchQuery,
-    activeCodeframe // Use activeCodeframe directly instead of uploadedCodeframe
+    activeCodeframe
   } = useProcessing();
   
   if (!uploadedFile || fileColumns.length === 0) {
@@ -70,8 +70,8 @@ const ColumnSelector: React.FC = () => {
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
             <div className="flex items-center gap-2">
               <FileCode className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium">Using uploaded codeframe: {activeCodeframe.name}</span>
-              <Badge variant="outline" className="ml-auto">{activeCodeframe.entries.length} codes</Badge>
+              <span className="text-sm font-medium overflow-hidden text-ellipsis whitespace-nowrap">Using uploaded codeframe: {activeCodeframe.name}</span>
+              <Badge variant="outline" className="ml-auto shrink-0">{activeCodeframe.entries.length} codes</Badge>
             </div>
           </div>
         )}
@@ -90,27 +90,28 @@ const ColumnSelector: React.FC = () => {
                     id={`column-${column.index}`}
                     checked={selectedColumns.includes(column.index)}
                     onCheckedChange={() => toggleColumnSelection(column.index)}
+                    className="mt-1"
                   />
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Label
                         htmlFor={`column-${column.index}`}
-                        className="font-medium cursor-pointer"
+                        className="font-medium cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap"
                       >
                         {column.name || `Column ${column.index + 1}`}
                       </Label>
                       {column.type === 'text' && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs shrink-0">
                           Text
                         </Badge>
                       )}
                       {column.type === 'mixed' && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs shrink-0">
                           Mixed
                         </Badge>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="text-xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
                       {column.examples.length > 0 
                         ? column.examples[0]
                         : 'No data'}

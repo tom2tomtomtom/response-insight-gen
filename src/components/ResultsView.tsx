@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
@@ -137,12 +137,14 @@ const ResultsView: React.FC = () => {
                     <tr key={entry.code}>
                       <td className="font-medium">{entry.code}</td>
                       <td>{entry.numeric || '-'}</td>
-                      <td>{entry.label}</td>
-                      <td>{entry.definition}</td>
+                      <td className="max-w-[150px] truncate">{entry.label}</td>
+                      <td className="max-w-[200px]">
+                        <div className="line-clamp-2">{entry.definition}</div>
+                      </td>
                       <td>
                         <ul className="list-disc list-inside">
                           {entry.examples.slice(0, 2).map((example, i) => (
-                            <li key={i} className="text-sm">{example}</li>
+                            <li key={i} className="text-sm truncate max-w-[200px]">{example}</li>
                           ))}
                           {entry.examples.length > 2 && (
                             <li className="text-xs text-muted-foreground">
@@ -222,8 +224,10 @@ const ResultsView: React.FC = () => {
                 <tbody>
                   {filteredResponses.map((response, index) => (
                     <tr key={index}>
-                      <td>{response.responseText}</td>
-                      <td>
+                      <td className="max-w-[350px]">
+                        <div className="line-clamp-2">{response.responseText}</div>
+                      </td>
+                      <td className="whitespace-nowrap">
                         {response.columnName || 'Unknown'}
                       </td>
                       <td>
