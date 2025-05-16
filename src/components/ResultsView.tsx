@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
@@ -14,7 +13,16 @@ import CodeSummaryChart from './CodeSummary';
 import { toast } from './ui/use-toast';
 
 const ResultsView: React.FC = () => {
-  const { results, isGeneratingExcel, downloadResults, downloadOriginalWithCodes, resetState, fileColumns, apiConfig } = useProcessing();
+  const { 
+    results, 
+    isGeneratingExcel, 
+    downloadResults, 
+    downloadOriginalWithCodes, 
+    resetState, 
+    fileColumns, 
+    apiConfig,
+    rawFileData 
+  } = useProcessing();
   const [searchFilter, setSearchFilter] = useState('');
   const [columnFilter, setColumnFilter] = useState<string>('all');
   const [exportOption, setExportOption] = useState<'coded' | 'original'>('coded');
@@ -60,6 +68,10 @@ const ResultsView: React.FC = () => {
       });
       
       if (exportOption === 'original') {
+        // Make sure raw file data is available
+        if (!rawFileData || rawFileData.length === 0) {
+          throw new Error("Original data not available for export");
+        }
         await downloadOriginalWithCodes();
       } else {
         await downloadResults();
@@ -74,10 +86,13 @@ const ResultsView: React.FC = () => {
       toast({
         variant: "destructive",
         title: "Download Failed",
-        description: "There was an error generating the Excel file. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error generating the Excel file. Please try again.",
       });
     }
   };
+  
+  // Check if original data export is available
+  const originalExportAvailable = rawFileData && rawFileData.length > 0;
   
   return (
     <Card className="w-full">
@@ -264,15 +279,18 @@ const ResultsView: React.FC = () => {
             <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="Select export type" />
             </SelectTrigger>
-            <SelectContent className="max-w-[300px]">
+            <SelectContent>
               <SelectItem value="coded">Coded responses only</SelectItem>
-              <SelectItem value="original">Original data with codes</SelectItem>
+              <SelectItem value="original" disabled={!originalExportAvailable}>
+                Original data with codes
+                {!originalExportAvailable && " (unavailable)"}
+              </SelectItem>
             </SelectContent>
           </Select>
           
           <Button 
             onClick={handleExport}
-            disabled={isGeneratingExcel}
+            disabled={isGeneratingExcel || (exportOption === 'original' && !originalExportAvailable)}
             className="space-x-2 w-full md:w-auto"
           >
             {isGeneratingExcel ? (

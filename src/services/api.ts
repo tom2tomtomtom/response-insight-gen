@@ -659,6 +659,8 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
 // Function to generate Excel with original data and codes
 export const generateExcelWithOriginalData = async (result: ProcessedResult, rawFileData: any[][]): Promise<Blob> => {
   try {
+    console.log("Generating Excel with original data. Raw data rows:", rawFileData?.length);
+    
     // Create a new workbook
     const workbook = XLSX.utils.book_new();
     
@@ -688,19 +690,7 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
       XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Code Summary");
     }
     
-    // Create a map of response texts to assigned codes for quick lookup
-    const responseToCodesMap = new Map();
-    result.codedResponses.forEach(response => {
-      responseToCodesMap.set(
-        response.responseText,
-        response.codesAssigned.map(code => {
-          const codeEntry = result.codeframe.find(c => c.code === code);
-          return codeEntry ? `${codeEntry.numeric || ''} - ${codeEntry.label}` : code;
-        }).join('; ')
-      );
-    });
-    
-    // Create the Coded Responses worksheet (same as regular export)
+    // Create the Coded Responses worksheet
     const responsesData = result.codedResponses.map(response => ({
       Response: response.responseText,
       Column: response.columnName || 'Unknown',
@@ -713,44 +703,84 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
     const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
     XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
     
-    // Create the Original Data with Codes worksheet
+    // Handle the Original Data with Codes worksheet
     if (rawFileData && rawFileData.length > 0) {
-      // Create a new sheet for original data
-      const originalWorksheet = XLSX.utils.aoa_to_sheet(rawFileData);
-      
-      // Add an additional header for the codes column
-      const lastCol = XLSX.utils.decode_col(originalWorksheet['!ref']?.split(':')[1].replace(/\d+/, '') || 'A');
-      const codeCol = XLSX.utils.encode_col(lastCol + 1);
-      
-      // Add "Assigned Codes" header in the next column after the last column
-      XLSX.utils.sheet_add_aoa(originalWorksheet, [['Assigned Codes']], {
-        origin: `${codeCol}1`
-      });
-      
-      // Map responses to codes in the original data
-      for (let row = 1; row < rawFileData.length; row++) {
-        for (let col = 0; col < rawFileData[row].length; col++) {
-          const cellValue = rawFileData[row][col];
-          if (cellValue && typeof cellValue === 'string') {
-            const assignedCodes = responseToCodesMap.get(cellValue);
-            if (assignedCodes) {
-              // Add the codes in the new column
-              XLSX.utils.sheet_add_aoa(originalWorksheet, [[assignedCodes]], {
-                origin: `${codeCol}${row + 1}`
-              });
+      try {
+        // Create a map of response texts to their assigned codes for easy lookup
+        const responseCodeMap = new Map();
+        result.codedResponses.forEach(response => {
+          // Get numeric codes
+          const codeString = response.codesAssigned.map(code => {
+            const codeEntry = result.codeframe.find(c => c.code === code);
+            return codeEntry ? codeEntry.numeric || code : code;
+          }).join('; ');
+          
+          // Get code labels
+          const labelString = response.codesAssigned.map(code => {
+            const codeEntry = result.codeframe.find(c => c.code === code);
+            return codeEntry ? codeEntry.label : code;
+          }).join('; ');
+          
+          // Store both numeric codes and code labels
+          responseCodeMap.set(response.responseText.trim().toLowerCase(), {
+            codes: codeString,
+            labels: labelString
+          });
+        });
+        
+        // Copy the raw data to a new array that we'll modify
+        const originalWithCodes = [];
+        
+        // First row is headers - copy and add additional headers
+        if (rawFileData[0]) {
+          const headers = [...rawFileData[0], "Assigned Codes", "Code Labels"];
+          originalWithCodes.push(headers);
+        }
+        
+        // Process each data row
+        for (let rowIndex = 1; rowIndex < rawFileData.length; rowIndex++) {
+          const row = rawFileData[rowIndex];
+          if (!row) continue;
+          
+          const newRow = [...row];
+          let foundCodes = false;
+          
+          // Look for coded responses in this row
+          for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
+            const cellValue = row[cellIndex];
+            
+            // Skip empty or non-string values
+            if (!cellValue || typeof cellValue !== 'string') continue;
+            
+            // Look for the cell text in our coded responses
+            const normalizedText = cellValue.trim().toLowerCase();
+            const codeInfo = responseCodeMap.get(normalizedText);
+            
+            if (codeInfo) {
+              newRow.push(codeInfo.codes);
+              newRow.push(codeInfo.labels);
+              foundCodes = true;
+              break;
             }
           }
+          
+          // If no codes were found, add empty cells
+          if (!foundCodes) {
+            newRow.push("");
+            newRow.push("");
+          }
+          
+          originalWithCodes.push(newRow);
         }
+        
+        // Convert the augmented data to a worksheet
+        const originalWorksheet = XLSX.utils.aoa_to_sheet(originalWithCodes);
+        XLSX.utils.book_append_sheet(workbook, originalWorksheet, "Original Data with Codes");
+        
+      } catch (sheetError) {
+        console.error("Error processing original data sheet:", sheetError);
+        // Continue with the rest of the export even if this sheet fails
       }
-      
-      // Update the sheet range to include the new column
-      const newLastCol = XLSX.utils.encode_col(lastCol + 1);
-      const oldRef = originalWorksheet['!ref'] || '';
-      const newRef = oldRef.replace(/:[A-Z]+/, `:${newLastCol}`);
-      originalWorksheet['!ref'] = newRef;
-      
-      // Add the original data sheet to the workbook
-      XLSX.utils.book_append_sheet(workbook, originalWorksheet, "Original Data with Codes");
     }
     
     // Write the workbook to an array buffer
