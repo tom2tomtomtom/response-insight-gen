@@ -659,30 +659,31 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
 // Function to generate Excel with original data and codes
 export const generateExcelWithOriginalData = async (result: ProcessedResult, rawFileData: any[][]): Promise<Blob> => {
   try {
-    console.log("Generating Excel with original data. Raw data rows:", rawFileData?.length);
+    console.log("Starting Excel generation with original data. Raw data rows:", rawFileData?.length);
     
-    // Validate input data more rigorously
+    // Step 1: Validate input data - must be strict
     if (!rawFileData || !Array.isArray(rawFileData) || rawFileData.length === 0) {
       throw new Error("No raw file data available for export");
     }
     
-    // Create a new workbook
+    // Step 2: Create a new workbook
     const workbook = XLSX.utils.book_new();
     
-    // Create the Codeframe worksheet (same as regular export)
+    // Step 3: Create the Codeframe worksheet - small data, safe to add first
     const codeframeData = result.codeframe.map(code => ({
       Code: code.code,
       Numeric: code.numeric || '',
       Label: code.label,
       Definition: code.definition,
-      Examples: code.examples.join('; '),
+      Examples: (code.examples || []).join('; '),
       Count: code.count || 0,
       Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%'
     }));
+    
     const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
     XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, "Codeframe");
     
-    // Create the Code Summary worksheet
+    // Step 4: Add the Code Summary worksheet - also small data
     if (result.codeSummary) {
       const summaryData = result.codeSummary.map(code => ({
         Code: code.code,
@@ -695,7 +696,7 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
       XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Code Summary");
     }
     
-    // Create the Coded Responses worksheet
+    // Step 5: Create the Coded Responses worksheet - medium sized data
     const responsesData = result.codedResponses.map(response => ({
       Response: response.responseText,
       Column: response.columnName || 'Unknown',
@@ -705,215 +706,153 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
         return codeEntry ? codeEntry.numeric || code : code;
       }).join('; ')
     }));
+    
     const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
     XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
     
-    // Handle the Original Data with Codes worksheet - with improved error handling
+    // Step 6: Process original data with codes - completely new approach
     try {
-      console.log("Creating original data worksheet - starting process");
+      console.log("Creating original data worksheet with memory-efficient approach");
       
-      // More defensive verification of raw data format
-      if (!Array.isArray(rawFileData) || rawFileData.some(row => row === undefined)) {
-        throw new Error("Raw data is not in the expected format");
-      }
-      
-      // Create a map of normalized response texts to their assigned codes for easy lookup
+      // 6.1: Build normalized lookup map for response matching - critical for performance
       const responseCodeMap = new Map();
       
-      // Build the map with more robust error handling
+      // Only include necessary data in the map to reduce memory usage
       result.codedResponses.forEach(response => {
-        if (!response || typeof response.responseText !== 'string') {
-          return; // Skip invalid entries
-        }
+        if (!response || !response.responseText) return;
         
-        try {
-          // Get numeric codes with validation
-          const codeString = (response.codesAssigned || [])
-            .filter(Boolean)
-            .map(code => {
-              const codeEntry = result.codeframe.find(c => c.code === code);
-              return codeEntry ? (codeEntry.numeric || code) : code;
-            }).join('; ');
-          
-          // Get code labels with validation
-          const labelString = (response.codesAssigned || [])
-            .filter(Boolean)
-            .map(code => {
-              const codeEntry = result.codeframe.find(c => c.code === code);
-              return codeEntry ? codeEntry.label : code;
-            }).join('; ');
-          
-          // Only store valid entries (both normalized and original forms)
-          if (response.responseText) {
-            // Store both exact match and normalized key for more flexible matching
-            const normalizedKey = response.responseText.trim().toLowerCase();
-            responseCodeMap.set(normalizedKey, {
-              codes: codeString,
-              labels: labelString
-            });
-            // Also store the original form for direct matches
-            responseCodeMap.set(response.responseText, {
-              codes: codeString,
-              labels: labelString
-            });
-          }
-        } catch (mapError) {
-          console.warn("Error processing a code mapping:", mapError);
+        // Get codes and labels as strings
+        const codes = (response.codesAssigned || [])
+          .map(code => {
+            const codeEntry = result.codeframe.find(c => c.code === code);
+            return codeEntry ? (codeEntry.numeric || code) : code;
+          })
+          .join('; ');
+        
+        const labels = (response.codesAssigned || [])
+          .map(code => {
+            const codeEntry = result.codeframe.find(c => c.code === code);
+            return codeEntry ? codeEntry.label : code;
+          })
+          .join('; ');
+        
+        // Store normalized key for case-insensitive matching
+        const normalizedKey = response.responseText.trim().toLowerCase();
+        if (normalizedKey) {
+          responseCodeMap.set(normalizedKey, { codes, labels });
         }
       });
       
       console.log(`Created response code map with ${responseCodeMap.size} entries`);
       
-      // Create a clean copy of raw data to avoid modifying the original
-      // Using manual array copy to prevent JSON stringify/parse issues with circular references
-      let originalWithCodes = [];
+      // 6.2: Don't pre-allocate the entire array - process in chunks
+      const MAX_ROWS = 50000; // Limit to prevent memory issues
+      const CHUNK_SIZE = 1000; // Process chunks of rows at a time
       
-      for (let i = 0; i < Math.min(rawFileData.length, 10000); i++) {
-        // Limit to 10,000 rows to prevent memory issues
-        if (Array.isArray(rawFileData[i])) {
-          // Create a new array for each row and copy primitive values
-          const newRow = [];
-          for (let j = 0; j < rawFileData[i].length; j++) {
-            newRow.push(rawFileData[i][j]);
-          }
-          originalWithCodes.push(newRow);
-        } else {
-          originalWithCodes.push([]);
-        }
-      }
+      // Get headers first
+      const headers = Array.isArray(rawFileData[0]) ? [...rawFileData[0], "Assigned Codes", "Code Labels"] : ["Assigned Codes", "Code Labels"];
+      const headerSheet = XLSX.utils.aoa_to_sheet([headers]);
+      XLSX.utils.book_append_sheet(workbook, headerSheet, "Original Data with Codes");
       
-      console.log("Successfully created copy of raw data");
-      
-      // First row is headers - copy and add additional headers
-      if (originalWithCodes.length > 0) {
-        if (!Array.isArray(originalWithCodes[0])) {
-          originalWithCodes[0] = [];
-        }
-        originalWithCodes[0].push("Assigned Codes");
-        originalWithCodes[0].push("Code Labels");
-      }
-      
-      // Process each data row with improved safety checks
+      // Process data in chunks to avoid memory issues
+      let processedRows = 0;
       let matchCount = 0;
       
-      for (let rowIndex = 1; rowIndex < originalWithCodes.length; rowIndex++) {
-        const row = originalWithCodes[rowIndex];
-        if (!row || !Array.isArray(row)) {
-          originalWithCodes[rowIndex] = ["", ""];
-          continue;
-        }
+      // Only process at most MAX_ROWS to avoid crashes
+      const rowsToProcess = Math.min(rawFileData.length, MAX_ROWS);
+      
+      for (let chunkStart = 1; chunkStart < rowsToProcess; chunkStart += CHUNK_SIZE) {
+        // Process each chunk
+        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, rowsToProcess);
+        const chunk = [];
         
-        let foundCodes = false;
-        
-        // Look for coded responses in this row
-        for (let cellIndex = 0; cellIndex < row.length; cellIndex++) {
-          const cellValue = row[cellIndex];
+        for (let i = chunkStart; i < chunkEnd; i++) {
+          const row = rawFileData[i];
+          if (!Array.isArray(row)) continue;
           
-          // Skip empty or non-string values
-          if (cellValue === null || cellValue === undefined) continue;
+          // Create a new row with assignment info
+          const newRow = [...row]; // Shallow copy is sufficient here
+          let foundMatch = false;
           
-          // Convert to string if it's not already
-          const cellText = String(cellValue).trim();
-          if (cellText.length === 0) continue;
-          
-          // Try multiple matching strategies
-          let codeInfo = null;
-          
-          // 1. Try direct match
-          if (responseCodeMap.has(cellText)) {
-            codeInfo = responseCodeMap.get(cellText);
-          } 
-          // 2. Try case-insensitive match
-          else {
+          // Try to find a coded response match in this row
+          for (let j = 0; j < row.length; j++) {
+            if (row[j] === null || row[j] === undefined) continue;
+            
+            // Convert to string and normalize
+            const cellText = String(row[j]).trim();
+            if (!cellText) continue;
+            
+            // Check for match using normalized version
             const normalizedText = cellText.toLowerCase();
-            if (responseCodeMap.has(normalizedText)) {
-              codeInfo = responseCodeMap.get(normalizedText);
+            const match = responseCodeMap.get(normalizedText);
+            
+            if (match) {
+              newRow.push(match.codes || "");
+              newRow.push(match.labels || "");
+              foundMatch = true;
+              matchCount++;
+              break;
             }
           }
           
-          if (codeInfo) {
-            row.push(codeInfo.codes || "");
-            row.push(codeInfo.labels || "");
-            foundCodes = true;
-            matchCount++;
-            break;
+          if (!foundMatch) {
+            newRow.push("");  // No codes
+            newRow.push("");  // No labels
           }
+          
+          chunk.push(newRow);
+          processedRows++;
         }
         
-        // If no codes were found, add empty cells
-        if (!foundCodes) {
-          row.push("");
-          row.push("");
-        }
+        // Add chunk to worksheet, with offset for header
+        XLSX.utils.sheet_add_aoa(headerSheet, chunk, { origin: -1 }); // -1 means append
+        
+        // Free memory
+        chunk.length = 0;
       }
       
-      console.log(`Found codes for ${matchCount} rows out of ${originalWithCodes.length-1} data rows`);
+      console.log(`Processed ${processedRows} rows, found matches for ${matchCount} rows`);
       
-      // Create the worksheet safely with chunk processing for large datasets
-      let originalWorksheet;
-      
-      if (originalWithCodes.length > 5000) {
-        console.log("Large dataset detected, using chunked processing");
-        
-        // For very large datasets, we'll use a chunking approach to prevent memory issues
-        const chunkSize = 1000;
-        const headerRow = originalWithCodes[0];
-        
-        // Start with the header
-        originalWorksheet = XLSX.utils.aoa_to_sheet([headerRow]);
-        
-        // Process rows in chunks
-        for (let i = 1; i < originalWithCodes.length; i += chunkSize) {
-          const chunk = originalWithCodes.slice(i, i + chunkSize);
-          XLSX.utils.sheet_add_aoa(originalWorksheet, chunk, { origin: i });
-        }
-      } else {
-        // For smaller datasets, we can create the worksheet directly
-        originalWorksheet = XLSX.utils.aoa_to_sheet(originalWithCodes);
-      }
-      
-      XLSX.utils.book_append_sheet(workbook, originalWorksheet, "Original Data with Codes");
-      console.log("Successfully added original data worksheet");
     } catch (sheetError) {
       console.error("Error processing original data sheet:", sheetError);
       
-      // Create a simple error explanation sheet instead
+      // Create an error explanation sheet instead
       const errorData = [
         ["Error Processing Original Data"],
-        ["An error occurred while trying to merge your original data with the codes."],
+        ["There was a problem processing your original data file:"],
+        [sheetError instanceof Error ? sheetError.message : String(sheetError)],
+        [""],
         ["Your coded responses are still available in the other sheets."],
-        ["Error details:"],
-        [sheetError instanceof Error ? sheetError.message : String(sheetError)]
+        ["Try one of these solutions:"],
+        ["1. Use 'Coded responses only' option instead"],
+        ["2. Try with a smaller dataset"],
+        ["3. Contact support if the problem persists"]
       ];
+      
       const errorWorksheet = XLSX.utils.aoa_to_sheet(errorData);
-      XLSX.utils.book_append_sheet(workbook, errorWorksheet, "Data Processing Error");
+      XLSX.utils.book_append_sheet(workbook, errorWorksheet, "Processing Error");
     }
     
-    console.log("Writing workbook to Excel buffer");
+    // Step 7: Write the complete workbook to Excel
+    console.log("Writing workbook to Excel buffer with compression");
     
-    // Use a try-catch specifically for the XLSX.write operation
     try {
-      // Write the workbook to an array buffer with timeout protection
+      // Use compression and efficient write options
       const excelBuffer = XLSX.write(workbook, { 
         bookType: 'xlsx', 
         type: 'array',
-        cellDates: true,
-        compression: true  // Use compression for large files
+        compression: true
       });
       
-      // Create a Blob from the ArrayBuffer with the correct MIME type
       return new Blob([excelBuffer], { 
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
     } catch (writeError) {
-      console.error("Error during Excel write operation:", writeError);
-      throw new Error("Failed to generate Excel file due to memory limitations. Your dataset may be too large.");
+      console.error("Failed in final Excel generation step:", writeError);
+      throw new Error("Failed to generate Excel file due to memory limitations. Try with a smaller dataset.");
     }
   } catch (error) {
-    console.error("Error generating Excel file with original data:", error);
-    throw new Error(error instanceof Error ? 
-      `Failed to generate Excel file: ${error.message}` : 
-      'Failed to generate Excel file with original data'
-    );
+    console.error("Error in Excel generation:", error);
+    throw error instanceof Error ? error : new Error('Unknown error occurred during Excel generation');
   }
 };

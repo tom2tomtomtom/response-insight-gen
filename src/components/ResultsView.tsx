@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
@@ -36,21 +35,9 @@ const ResultsView: React.FC = () => {
         // Count rows
         const rows = rawFileData.length;
         
-        // Estimate size
-        let totalCells = 0;
-        let avgCellSize = 0;
-        
-        // Sample the first 100 rows to estimate average cell size
-        const sampleSize = Math.min(100, rows);
-        for (let i = 0; i < sampleSize; i++) {
-          if (Array.isArray(rawFileData[i])) {
-            totalCells += rawFileData[i].length;
-          }
-        }
-        
-        // Rough size estimation - 20 bytes per cell average
-        avgCellSize = 20; // bytes
-        const estimatedSize = Math.round((totalCells / sampleSize) * rows * avgCellSize);
+        // Simple size estimation based on row count and average row size
+        const avgRowSizeBytes = 200; // Conservative estimate
+        const estimatedSize = rows * avgRowSizeBytes;
         
         // Format size in KB or MB
         let sizeString: string;
@@ -95,25 +82,37 @@ const ResultsView: React.FC = () => {
     return matchesSearch && matchesColumn;
   });
 
-  // Handle export based on selected option with improved error handling
+  // Handle export with improved error handling and user feedback
   const handleExport = async () => {
     if (isGeneratingExcel) {
       return; // Prevent multiple clicks
     }
     
     try {
+      // Validate before export - especially important for original data
       if (exportOption === 'original') {
-        // Verify raw file data is available and show warning for large files
         if (!rawFileData || !Array.isArray(rawFileData) || rawFileData.length === 0) {
-          throw new Error("Original data not available for export");
+          throw new Error("Original data not available for export. Please try the 'Coded responses only' option.");
         }
         
-        // Warn about potentially large file exports
+        // Show file size warning for large files
         if (rawFileData.length > 5000) {
+          const warningText = `You're exporting a large file (${rawDataInfo?.rows.toLocaleString()} rows, ${rawDataInfo?.size}). This may take a while.`;
+          
           toast({
             title: "Large File Warning",
-            description: `You're exporting a large file (${rawDataInfo?.size || 'unknown size'}). This may take a while and could cause your browser to become unresponsive.`,
+            description: warningText,
             duration: 6000,
+          });
+        }
+        
+        // Additional warning for extremely large files
+        if (rawFileData.length > 20000) {
+          toast({
+            variant: "destructive",  
+            title: "Very Large File Warning",
+            description: "Your file is extremely large and may cause issues. Consider using 'Coded responses only' option instead.",
+            duration: 8000,
           });
         }
         
@@ -122,7 +121,6 @@ const ResultsView: React.FC = () => {
           description: "Please wait while we prepare your download with original data...",
         });
         
-        // Add more detailed logging 
         console.log("Starting original data export", {
           rawFileDataLength: rawFileData.length,
           resultsAvailable: !!results,
@@ -131,6 +129,7 @@ const ResultsView: React.FC = () => {
         
         await downloadOriginalWithCodes();
       } else {
+        // Standard export - simpler
         toast({
           title: "Generating Excel File",
           description: "Please wait while we prepare your download...",
@@ -145,11 +144,15 @@ const ResultsView: React.FC = () => {
       });
     } catch (error) {
       console.error("Export failed:", error);
+      
+      // More helpful error message
       toast({
         variant: "destructive",
         title: "Download Failed",
-        description: error instanceof Error ? error.message : "There was an error generating the Excel file. Please try again with a smaller dataset or use the 'Coded responses only' option.",
-        duration: 8000,
+        description: error instanceof Error 
+          ? error.message 
+          : "There was an error generating the Excel file. Please try with 'Coded responses only' option.",
+        duration: 10000,
       });
     }
   };
@@ -158,7 +161,7 @@ const ResultsView: React.FC = () => {
   const hasRawFileData = rawFileData && Array.isArray(rawFileData) && rawFileData.length > 0;
   const originalExportAvailable = hasRawFileData;
   
-  // Show warning if original data is very large (might crash)
+  // Flag for very large datasets
   const isLargeDataset = rawFileData && Array.isArray(rawFileData) && rawFileData.length > 10000;
   
   return (
@@ -355,14 +358,14 @@ const ResultsView: React.FC = () => {
             </SelectContent>
           </Select>
           
-          {/* Show warning for large dataset export */}
+          {/* Warning for large dataset export */}
           {isLargeDataset && exportOption === 'original' && (
             <Alert variant="warning" className="mt-2 mb-2 p-2 text-sm">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle className="text-sm">Large Dataset Warning</AlertTitle>
               <AlertDescription className="text-xs">
                 You're exporting a large file ({rawDataInfo?.rows.toLocaleString()} rows, {rawDataInfo?.size}). 
-                This may take longer and could cause browser performance issues.
+                This may cause performance issues.
               </AlertDescription>
             </Alert>
           )}
