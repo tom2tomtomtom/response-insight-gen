@@ -47,14 +47,28 @@ const ResultsView: React.FC = () => {
     return matchesSearch && matchesColumn;
   });
 
-  // Handle export based on selected option
+  // Handle export based on selected option with improved error handling
   const handleExport = async () => {
+    if (isGeneratingExcel) {
+      return; // Prevent multiple clicks
+    }
+    
     try {
+      toast({
+        title: "Generating Excel File",
+        description: "Please wait while we prepare your download...",
+      });
+      
       if (exportOption === 'original') {
         await downloadOriginalWithCodes();
       } else {
         await downloadResults();
       }
+      
+      toast({
+        title: "Download Complete",
+        description: "Your Excel file has been generated successfully.",
+      });
     } catch (error) {
       console.error("Export failed:", error);
       toast({
@@ -250,7 +264,7 @@ const ResultsView: React.FC = () => {
             <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="Select export type" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[300px]">
               <SelectItem value="coded">Coded responses only</SelectItem>
               <SelectItem value="original">Original data with codes</SelectItem>
             </SelectContent>

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -17,17 +17,45 @@ interface ApiConfigFormValues {
   apiUrl: string;
 }
 
+// Session storage keys
+const API_KEY_STORAGE_KEY = 'qualCode_apiKey';
+const API_URL_STORAGE_KEY = 'qualCode_apiUrl';
+
 const ApiKeyConfig: React.FC = () => {
   const { apiConfig, setApiConfig, testApiConnection } = useProcessing();
   const [isLoading, setIsLoading] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
   
+  // Initialize form with values from session storage if available
   const form = useForm<ApiConfigFormValues>({
     defaultValues: {
-      apiKey: apiConfig?.apiKey || '',
-      apiUrl: apiConfig?.apiUrl || 'https://api.openai.com/v1/chat/completions'
+      apiKey: '',
+      apiUrl: 'https://api.openai.com/v1/chat/completions'
     }
   });
+
+  // Load saved API config from session storage on component mount
+  useEffect(() => {
+    const savedApiKey = sessionStorage.getItem(API_KEY_STORAGE_KEY);
+    const savedApiUrl = sessionStorage.getItem(API_URL_STORAGE_KEY);
+    
+    if (savedApiKey) {
+      form.setValue('apiKey', savedApiKey);
+    }
+    
+    if (savedApiUrl) {
+      form.setValue('apiUrl', savedApiUrl);
+    }
+    
+    // If we have both key and URL, apply them to the app state
+    if (savedApiKey && savedApiUrl) {
+      setApiConfig({
+        apiKey: savedApiKey,
+        apiUrl: savedApiUrl,
+        isConfigured: true
+      });
+    }
+  }, []);
 
   const onSubmit = async (values: ApiConfigFormValues) => {
     setIsLoading(true);
@@ -36,6 +64,10 @@ const ApiKeyConfig: React.FC = () => {
       const success = await testApiConnection(values.apiKey, values.apiUrl);
       
       if (success) {
+        // Save to session storage
+        sessionStorage.setItem(API_KEY_STORAGE_KEY, values.apiKey);
+        sessionStorage.setItem(API_URL_STORAGE_KEY, values.apiUrl);
+        
         // Only set the config if the test was successful
         setApiConfig({
           apiKey: values.apiKey,
