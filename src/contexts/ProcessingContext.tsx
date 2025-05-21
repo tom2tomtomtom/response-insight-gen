@@ -49,6 +49,7 @@ interface ProcessingContextType {
   downloadResults: () => Promise<void>;
   resetState: () => void;
   toggleColumnSelection: (columnIndex: number) => void;
+  selectMultipleColumns: (columnIndices: number[], shouldSelect: boolean) => void;
   setSearchQuery: (query: string) => void;
   saveUploadedCodeframe: (codeframe: UploadedCodeframe) => void;
   setActiveCodeframe: (codeframe: UploadedCodeframe | null) => void;
@@ -526,6 +527,20 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
+  // Select or deselect multiple columns at once
+  const selectMultipleColumns = (columnIndices: number[], shouldSelect: boolean) => {
+    setSelectedColumns(prev => {
+      if (shouldSelect) {
+        // Add all columns that aren't already selected
+        const newColumns = columnIndices.filter(idx => !prev.includes(idx));
+        return [...prev, ...newColumns];
+      } else {
+        // Remove all specified columns
+        return prev.filter(idx => !columnIndices.includes(idx));
+      }
+    });
+  };
+
   // Save uploaded codeframe
   const saveUploadedCodeframe = (codeframe: UploadedCodeframe) => {
     setUploadedCodeframes(prev => [...prev, codeframe]);
@@ -814,6 +829,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     downloadResults,
     resetState,
     toggleColumnSelection,
+    selectMultipleColumns,
     setSearchQuery,
     saveUploadedCodeframe,
     setActiveCodeframe,

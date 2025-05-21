@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Search, Play, FileText, FileCode, Tag } from 'lucide-react';
+import { Search, Play, FileText, FileCode, Tag, CheckSquare } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Link } from 'react-router-dom';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
@@ -22,7 +22,8 @@ const ColumnSelector: React.FC = () => {
   const { 
     fileColumns, 
     selectedColumns, 
-    toggleColumnSelection, 
+    toggleColumnSelection,
+    selectMultipleColumns,
     startProcessing, 
     uploadedFile, 
     searchQuery,
@@ -49,6 +50,16 @@ const ColumnSelector: React.FC = () => {
   
   const selectedCount = selectedColumns.length;
   const textColumnCount = displayColumns.length;
+
+  // Check if all filtered columns are already selected
+  const areAllFilteredSelected = filteredColumns.length > 0 &&
+    filteredColumns.every(col => selectedColumns.includes(col.index));
+
+  // Handle selecting or deselecting all filtered columns
+  const handleSelectAllFiltered = () => {
+    const filteredColumnIndices = filteredColumns.map(col => col.index);
+    selectMultipleColumns(filteredColumnIndices, !areAllFilteredSelected);
+  };
   
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -90,14 +101,27 @@ const ColumnSelector: React.FC = () => {
           We've identified {textColumnCount} text response columns. 
           Select columns and assign question types for analysis.
         </CardDescription>
-        <div className="relative mt-2">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search columns..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={handleSearchChange}
-          />
+        <div className="flex items-center gap-2 mt-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search columns..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={handleSearchChange}
+            />
+          </div>
+          {filteredColumns.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAllFiltered}
+              className="shrink-0 flex items-center gap-1"
+            >
+              <CheckSquare className="h-4 w-4" />
+              <span>{areAllFilteredSelected ? "Deselect All" : "Select All"}</span>
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent>
