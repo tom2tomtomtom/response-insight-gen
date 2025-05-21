@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card';
 import { Checkbox } from './ui/checkbox';
@@ -6,11 +5,12 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Search, Play, FileText, FileCode, Tag, CheckSquare } from 'lucide-react';
+import { Search, Play, FileText, FileCode, Tag, CheckSquare, Lightbulb } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Link } from 'react-router-dom';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Alert, AlertDescription } from './ui/alert';
 
 const QUESTION_TYPES = {
   "brand_awareness": "Unaided Brand Awareness",
@@ -88,6 +88,11 @@ const ColumnSelector: React.FC = () => {
     }));
   };
   
+  // Check if we have any non-miscellaneous question types selected
+  const hasSpecializedQuestionTypes = selectedColumns.some(
+    columnIndex => columnQuestionTypes[columnIndex] && columnQuestionTypes[columnIndex] !== "miscellaneous"
+  );
+  
   return (
     <Card className="w-full">
       <CardHeader>
@@ -134,6 +139,16 @@ const ColumnSelector: React.FC = () => {
             </div>
           </div>
         )}
+        
+        {/* Insights Tips Alert */}
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <Lightbulb className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-sm">
+            <span className="font-medium">Pro tip:</span> To get AI insights in your analysis, select at least one 
+            <span className="font-medium"> Brand Awareness</span> or <span className="font-medium"> Brand Description</span> question.
+            Analyzing only Miscellaneous questions won't generate insights.
+          </AlertDescription>
+        </Alert>
         
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -275,6 +290,13 @@ const ColumnSelector: React.FC = () => {
             </Button>
           )}
         </div>
+        
+        {!hasSpecializedQuestionTypes && selectedCount > 0 && (
+          <div className="text-xs text-amber-600 flex items-center gap-1 mb-2 md:mb-0">
+            <Lightbulb className="h-3.5 w-3.5" />
+            <span>Select specialized question types for AI insights</span>
+          </div>
+        )}
         
         <Button 
           onClick={startProcessing}
