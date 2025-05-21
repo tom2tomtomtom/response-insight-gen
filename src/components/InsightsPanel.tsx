@@ -24,8 +24,8 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights }) => {
         <MessageSquare className="h-4 w-4 text-blue-500" />
         <h3 className="font-medium">Key Insights</h3>
       </div>
-      <div className="text-sm prose max-w-none dark:prose-invert">
-        <pre className="whitespace-pre-wrap text-sm font-sans">{cleanedInsights}</pre>
+      <div className="text-sm prose max-w-none dark:prose-invert text-left">
+        <pre className="whitespace-pre-wrap text-sm font-sans text-left">{cleanedInsights}</pre>
       </div>
     </div>
   );
