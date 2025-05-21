@@ -1,31 +1,22 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { MessageSquare } from 'lucide-react';
-import { Badge } from './ui/badge';
 
 interface InsightsPanelProps {
   insights: string;
 }
 
 const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights }) => {
-  if (!insights) return null;
-  
   return (
-    <Card className="w-full mb-6">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <MessageSquare className="h-5 w-5 text-blue-500" />
-          <span>Analysis Insights</span>
-          <Badge variant="outline" className="ml-auto">AI Generated</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="prose max-w-none">
-          <pre className="whitespace-pre-wrap text-sm font-sans">{insights}</pre>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-md dark:bg-blue-950 dark:border-blue-900">
+      <div className="flex items-center gap-2 mb-2">
+        <MessageSquare className="h-4 w-4 text-blue-500" />
+        <h3 className="font-medium">Key Insights</h3>
+      </div>
+      <div className="text-sm prose max-w-none dark:prose-invert">
+        <pre className="whitespace-pre-wrap text-sm font-sans">{insights}</pre>
+      </div>
+    </div>
   );
 };
 
