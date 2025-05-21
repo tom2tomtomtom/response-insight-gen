@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { Loader2, Download, RefreshCw, Filter, AlertCircle, BarChart } from 'lucide-react';
+import { Loader2, Download, RefreshCw, Filter, AlertCircle, BarChart, MessageSquare } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -12,6 +11,18 @@ import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { ColumnInfo } from '../types';
 import CodeSummaryChart from './CodeSummary';
 import { toast } from './ui/use-toast';
+import { getQuestionTypeName } from '../utils/questionTypes';
+import InsightsPanel from './InsightsPanel';
+
+// Helper to get human-readable question type name
+const getQuestionTypeName = (questionType: string): string => {
+  switch (questionType) {
+    case 'brand_awareness': return 'Unaided Brand Awareness';
+    case 'brand_description': return 'Brand Description';
+    case 'miscellaneous': return 'Miscellaneous';
+    default: return questionType.charAt(0).toUpperCase() + questionType.slice(1).replace('_', ' ');
+  }
+};
 
 const ResultsView: React.FC = () => {
   const { 
@@ -21,15 +32,28 @@ const ResultsView: React.FC = () => {
     resetState, 
     fileColumns, 
     apiConfig,
-    rawFileData 
+    rawFileData,
+    multipleCodeframes,
+    insights
   } = useProcessing();
+  
   const [searchFilter, setSearchFilter] = useState('');
   const [columnFilter, setColumnFilter] = useState<string>('all');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<string>('all');
+  const [selectedQuestionType, setSelectedQuestionType] = useState<string | null>(null);
   
   if (!results) {
     return null;
   }
 
+  // Check if we have multiple codeframes
+  const hasMultipleCodeframes = multipleCodeframes && Object.keys(multipleCodeframes).length > 0;
+  
+  // Set default selected question type if not already set
+  if (hasMultipleCodeframes && !selectedQuestionType) {
+    setSelectedQuestionType(Object.keys(multipleCodeframes)[0]);
+  }
+  
   // Get available columns from the results
   const availableColumns = [...new Set(
     results.codedResponses
@@ -39,6 +63,22 @@ const ResultsView: React.FC = () => {
         index: r.columnIndex !== undefined ? r.columnIndex : -1
       }))
   )];
+  
+  // Get available question types
+  const availableQuestionTypes = hasMultipleCodeframes ? 
+    Object.keys(multipleCodeframes).map(key => ({
+      id: key,
+      name: getQuestionTypeName(key)
+    })) : [];
+  
+  // Get the currently selected codeframe and summary
+  const currentCodeframe = hasMultipleCodeframes && selectedQuestionType ? 
+    multipleCodeframes[selectedQuestionType].codeframe : 
+    results.codeframe;
+    
+  const currentCodeSummary = hasMultipleCodeframes && selectedQuestionType ? 
+    multipleCodeframes[selectedQuestionType].codeSummary : 
+    results.codeSummary;
   
   // Apply filters to the coded responses
   const filteredResponses = results.codedResponses.filter(response => {
@@ -51,7 +91,17 @@ const ResultsView: React.FC = () => {
       (response.columnIndex !== undefined && 
        response.columnIndex.toString() === columnFilter);
     
-    return matchesSearch && matchesColumn;
+    // Apply question type filter if available
+    let matchesQuestionType = true;
+    if (hasMultipleCodeframes && questionTypeFilter !== 'all') {
+      const responseType = response.columnIndex !== undefined ? 
+        multipleCodeframes[questionTypeFilter]?.codeframe?.some(
+          (code: any) => response.codesAssigned.includes(code.code)
+        ) : false;
+      matchesQuestionType = responseType;
+    }
+    
+    return matchesSearch && matchesColumn && matchesQuestionType;
   });
 
   // Handle export with improved error handling and user feedback
@@ -105,11 +155,45 @@ const ResultsView: React.FC = () => {
             </AlertDescription>
           </Alert>
         )}
+        
+        {/* Question Type Selector (only if multiple question types exist) */}
+        {hasMultipleCodeframes && (
+          <div className="mt-4">
+            <Select
+              value={selectedQuestionType || ''}
+              onValueChange={setSelectedQuestionType}
+            >
+              <SelectTrigger className="w-full md:w-[300px]">
+                <SelectValue placeholder="Select question type to view" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableQuestionTypes.map(type => (
+                  <SelectItem key={type.id} value={type.id}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
+        {/* Show insights if available */}
+        {insights && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-md">
+            <div className="flex items-center gap-2 mb-2">
+              <MessageSquare className="h-4 w-4 text-blue-500" />
+              <h3 className="font-medium">Key Insights</h3>
+            </div>
+            <div className="text-sm prose max-w-none">
+              <pre className="whitespace-pre-wrap text-sm font-sans">{insights}</pre>
+            </div>
+          </div>
+        )}
+      
         {/* Add Code Summary Chart if we have code summary data */}
-        {results.codeSummary && results.codeSummary.length > 0 && (
-          <CodeSummaryChart codeSummary={results.codeSummary} />
+        {currentCodeSummary && currentCodeSummary.length > 0 && (
+          <CodeSummaryChart codeSummary={currentCodeSummary} />
         )}
       
         <Tabs defaultValue="codeframe">
@@ -119,6 +203,89 @@ const ResultsView: React.FC = () => {
           </TabsList>
           
           <TabsContent value="codeframe" className="mt-4">
+            {/* Display hierarchies or themes if available */}
+            {hasMultipleCodeframes && selectedQuestionType && (
+              <>
+                {/* Display brand hierarchies for brand awareness questions */}
+                {selectedQuestionType === 'brand_awareness' && 
+                 multipleCodeframes[selectedQuestionType].brandHierarchies && (
+                  <div className="mb-4 overflow-x-auto">
+                    <h3 className="text-sm font-medium mb-2">Brand Hierarchies</h3>
+                    <table className="excel-table mb-4">
+                      <thead>
+                        <tr>
+                          <th>Parent System</th>
+                          <th>Child Brands</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(multipleCodeframes[selectedQuestionType].brandHierarchies).map(([parent, children]) => (
+                          <tr key={parent}>
+                            <td className="font-medium">{parent}</td>
+                            <td>
+                              <ul className="list-disc list-inside">
+                                {(children as string[]).map(child => {
+                                  const childCode = currentCodeframe.find((c: any) => c.code === child);
+                                  return (
+                                    <li key={child} className="text-sm">
+                                      {childCode ? childCode.label : child}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </td>
+                            <td className="text-center">
+                              {(children as string[]).length}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {/* Display attribute themes for brand description questions */}
+                {selectedQuestionType === 'brand_description' && 
+                 multipleCodeframes[selectedQuestionType].attributeThemes && (
+                  <div className="mb-4 overflow-x-auto">
+                    <h3 className="text-sm font-medium mb-2">Attribute Themes</h3>
+                    <table className="excel-table mb-4">
+                      <thead>
+                        <tr>
+                          <th>Theme</th>
+                          <th>Attributes</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(multipleCodeframes[selectedQuestionType].attributeThemes).map(([theme, attributes]) => (
+                          <tr key={theme}>
+                            <td className="font-medium">{theme}</td>
+                            <td>
+                              <ul className="list-disc list-inside">
+                                {(attributes as string[]).map(attr => {
+                                  const attrCode = currentCodeframe.find((c: any) => c.code === attr);
+                                  return (
+                                    <li key={attr} className="text-sm">
+                                      {attrCode ? attrCode.label : attr}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </td>
+                            <td className="text-center">
+                              {(attributes as string[]).length}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+            
             <div className="overflow-x-auto">
               <table className="excel-table">
                 <thead>
@@ -133,7 +300,7 @@ const ResultsView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {results.codeframe.map(entry => (
+                  {currentCodeframe.map((entry: any) => (
                     <tr key={entry.code}>
                       <td className="font-medium">{entry.code}</td>
                       <td>{entry.numeric || '-'}</td>
@@ -143,12 +310,12 @@ const ResultsView: React.FC = () => {
                       </td>
                       <td>
                         <ul className="list-disc list-inside">
-                          {entry.examples.slice(0, 2).map((example, i) => (
+                          {(entry.examples || []).slice(0, 2).map((example: string, i: number) => (
                             <li key={i} className="text-sm truncate max-w-[200px]">{example}</li>
                           ))}
-                          {entry.examples.length > 2 && (
+                          {(entry.examples || []).length > 2 && (
                             <li className="text-xs text-muted-foreground">
-                              +{entry.examples.length - 2} more
+                              +{(entry.examples || []).length - 2} more
                             </li>
                           )}
                         </ul>
@@ -158,7 +325,7 @@ const ResultsView: React.FC = () => {
                     </tr>
                   ))}
                   {/* Add "Other" category if not already present */}
-                  {!results.codeframe.some(code => code.code === "Other") && (
+                  {!currentCodeframe.some((code: any) => code.code === "Other") && (
                     <tr>
                       <td className="font-medium">Other</td>
                       <td>0</td>
@@ -205,6 +372,28 @@ const ResultsView: React.FC = () => {
                 </Select>
               </div>
               
+              {hasMultipleCodeframes && (
+                <div className="w-full md:w-48">
+                  <label className="text-sm text-muted-foreground mb-2 block">Filter by question type</label>
+                  <Select 
+                    value={questionTypeFilter}
+                    onValueChange={setQuestionTypeFilter}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All question types</SelectItem>
+                      {availableQuestionTypes.map(type => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
               <div>
                 <Badge variant="secondary">
                   {filteredResponses.length} responses
@@ -218,37 +407,66 @@ const ResultsView: React.FC = () => {
                   <tr>
                     <th>Response</th>
                     <th>Column</th>
+                    {hasMultipleCodeframes && <th>Question Type</th>}
                     <th>Assigned Codes</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredResponses.map((response, index) => (
-                    <tr key={index}>
-                      <td className="max-w-[350px]">
-                        <div className="line-clamp-2">{response.responseText}</div>
-                      </td>
-                      <td className="whitespace-nowrap">
-                        {response.columnName || 'Unknown'}
-                      </td>
-                      <td>
-                        <div className="flex flex-wrap gap-1">
-                          {response.codesAssigned.map(code => {
-                            // Find the full code entry to get the numeric code
-                            const codeEntry = results.codeframe.find(c => c.code === code);
-                            return (
-                              <span 
-                                key={code} 
-                                className="bg-primary/10 text-primary text-xs rounded px-2 py-0.5"
-                                title={codeEntry?.label || code}
-                              >
-                                {codeEntry?.numeric || code}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredResponses.map((response, index) => {
+                    // Determine question type for this response
+                    let questionType = 'miscellaneous';
+                    if (hasMultipleCodeframes && response.columnIndex !== undefined) {
+                      questionType = Object.keys(multipleCodeframes).find(type => 
+                        multipleCodeframes[type].codeframe.some(
+                          (code: any) => response.codesAssigned.includes(code.code)
+                        )
+                      ) || 'miscellaneous';
+                    }
+                    
+                    return (
+                      <tr key={index}>
+                        <td className="max-w-[350px]">
+                          <div className="line-clamp-2">{response.responseText}</div>
+                        </td>
+                        <td className="whitespace-nowrap">
+                          {response.columnName || 'Unknown'}
+                        </td>
+                        {hasMultipleCodeframes && (
+                          <td className="whitespace-nowrap">
+                            {getQuestionTypeName(questionType)}
+                          </td>
+                        )}
+                        <td>
+                          <div className="flex flex-wrap gap-1">
+                            {response.codesAssigned.map(code => {
+                              // Find the appropriate codeframe to get the code details
+                              let codeEntry;
+                              
+                              if (hasMultipleCodeframes) {
+                                // Look for the code in the corresponding question type codeframe
+                                Object.values(multipleCodeframes).forEach((typeData: any) => {
+                                  const found = typeData.codeframe.find((c: any) => c.code === code);
+                                  if (found) codeEntry = found;
+                                });
+                              } else {
+                                codeEntry = results.codeframe.find(c => c.code === code);
+                              }
+                              
+                              return (
+                                <span 
+                                  key={code} 
+                                  className="bg-primary/10 text-primary text-xs rounded px-2 py-0.5"
+                                  title={codeEntry?.label || code}
+                                >
+                                  {codeEntry?.numeric || code}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               

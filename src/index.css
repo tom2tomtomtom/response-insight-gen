@@ -110,13 +110,35 @@
   border: 1px solid #e2e8f0;
   padding: 0.5rem;
   text-align: left;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .excel-table th {
   background-color: #f8fafc;
   font-weight: 500;
+  position: relative;
 }
 
 .excel-table tr:nth-child(even) {
   background-color: #f8fafc;
+}
+
+/* Make sure all text content is properly contained */
+.excel-table .text-ellipsis {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+  display: block;
+}
+
+/* Styles for markdown content in insights */
+pre.whitespace-pre-wrap {
+  white-space: pre-wrap;
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
 }

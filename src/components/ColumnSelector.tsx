@@ -1,14 +1,22 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Search, Play, FileText, FileCode } from 'lucide-react';
+import { Search, Play, FileText, FileCode, Tag } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Link } from 'react-router-dom';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+
+const QUESTION_TYPES = {
+  "brand_awareness": "Unaided Brand Awareness",
+  "brand_description": "Brand Description",
+  "miscellaneous": "Miscellaneous"
+};
 
 const ColumnSelector: React.FC = () => {
   const { 
@@ -19,7 +27,11 @@ const ColumnSelector: React.FC = () => {
     uploadedFile, 
     searchQuery,
     setSearchQuery,
-    activeCodeframe
+    activeCodeframe,
+    columnQuestionTypes,
+    setColumnQuestionType,
+    columnSettings,
+    updateColumnSetting
   } = useProcessing();
   
   if (!uploadedFile || fileColumns.length === 0) {
@@ -41,6 +53,29 @@ const ColumnSelector: React.FC = () => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
+
+  const handleQuestionTypeChange = (columnIndex: number, questionType: string) => {
+    setColumnQuestionType(columnIndex, questionType);
+  };
+
+  const handleNetsSettingChange = (columnIndex: number, hasNets: boolean) => {
+    updateColumnSetting(columnIndex, "hasNets", hasNets);
+  };
+
+  const getSelectedTypes = () => {
+    const types: Record<string, number> = {};
+    
+    selectedColumns.forEach(columnIndex => {
+      const type = columnQuestionTypes[columnIndex] || "miscellaneous";
+      types[type] = (types[type] || 0) + 1;
+    });
+    
+    return Object.entries(types).map(([type, count]) => ({
+      type,
+      label: QUESTION_TYPES[type as keyof typeof QUESTION_TYPES],
+      count
+    }));
+  };
   
   return (
     <Card className="w-full">
@@ -53,7 +88,7 @@ const ColumnSelector: React.FC = () => {
         </CardTitle>
         <CardDescription>
           We've identified {textColumnCount} text response columns. 
-          Select which columns to analyze.
+          Select columns and assign question types for analysis.
         </CardDescription>
         <div className="relative mt-2">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -70,7 +105,7 @@ const ColumnSelector: React.FC = () => {
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
             <div className="flex items-center gap-2">
               <FileCode className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium overflow-hidden text-ellipsis whitespace-nowrap">Using uploaded codeframe: {activeCodeframe.name}</span>
+              <span className="text-sm font-medium text-ellipsis overflow-hidden whitespace-nowrap">Using uploaded codeframe: {activeCodeframe.name}</span>
               <Badge variant="outline" className="ml-auto shrink-0">{activeCodeframe.entries.length} codes</Badge>
             </div>
           </div>
@@ -82,49 +117,104 @@ const ColumnSelector: React.FC = () => {
               filteredColumns.map((column) => (
                 <div
                   key={column.index}
-                  className={`flex items-start space-x-2 border rounded-md p-3 ${
+                  className={`flex flex-col space-y-3 border rounded-md p-3 ${
                     column.type === 'text' ? 'bg-blue-50/50 border-blue-100' : 'bg-gray-50 border-gray-100'
                   } ${selectedColumns.includes(column.index) ? 'ring-1 ring-primary' : ''}`}
                 >
-                  <Checkbox
-                    id={`column-${column.index}`}
-                    checked={selectedColumns.includes(column.index)}
-                    onCheckedChange={() => toggleColumnSelection(column.index)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Label
-                        htmlFor={`column-${column.index}`}
-                        className="font-medium cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap"
-                      >
-                        {column.name || `Column ${column.index + 1}`}
-                      </Label>
-                      {column.type === 'text' && (
-                        <Badge variant="secondary" className="text-xs shrink-0">
-                          Text
-                        </Badge>
-                      )}
-                      {column.type === 'mixed' && (
-                        <Badge variant="outline" className="text-xs shrink-0">
-                          Mixed
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-                      {column.examples.length > 0 
-                        ? column.examples[0]
-                        : 'No data'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {column.stats.textLength > 0 && (
-                        <span>Avg. length: {column.stats.textLength.toFixed(1)} chars • </span>
-                      )}
-                      {column.stats.textPercentage > 0 && (
-                        <span>{column.stats.textPercentage.toFixed(0)}% text values</span>
-                      )}
+                  <div className="flex items-start space-x-2">
+                    <Checkbox
+                      id={`column-${column.index}`}
+                      checked={selectedColumns.includes(column.index)}
+                      onCheckedChange={() => toggleColumnSelection(column.index)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Label
+                          htmlFor={`column-${column.index}`}
+                          className="font-medium cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap"
+                        >
+                          {column.name || `Column ${column.index + 1}`}
+                        </Label>
+                        {column.type === 'text' && (
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            Text
+                          </Badge>
+                        )}
+                        {column.type === 'mixed' && (
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            Mixed
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                        {column.examples.length > 0 
+                          ? column.examples[0]
+                          : 'No data'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {column.stats.textLength > 0 && (
+                          <span>Avg. length: {column.stats.textLength.toFixed(1)} chars • </span>
+                        )}
+                        {column.stats.textPercentage > 0 && (
+                          <span>{column.stats.textPercentage.toFixed(0)}% text values</span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  
+                  {selectedColumns.includes(column.index) && (
+                    <div className="pt-2 border-t border-gray-100">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label htmlFor={`qtype-${column.index}`} className="text-xs text-muted-foreground">
+                            Question Type
+                          </Label>
+                          <Select
+                            value={columnQuestionTypes[column.index] || "miscellaneous"}
+                            onValueChange={(value) => handleQuestionTypeChange(column.index, value)}
+                          >
+                            <SelectTrigger id={`qtype-${column.index}`} className="h-8 text-xs w-[180px]">
+                              <SelectValue placeholder="Select question type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="brand_awareness">Unaided Brand Awareness</SelectItem>
+                              <SelectItem value="brand_description">Brand Description</SelectItem>
+                              <SelectItem value="miscellaneous">Miscellaneous</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Label 
+                              htmlFor={`nets-${column.index}`} 
+                              className="text-xs text-muted-foreground"
+                            >
+                              Requires Nets/Sub-nets
+                            </Label>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-help">
+                                    <Tag className="h-3 w-3 text-muted-foreground" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent className="w-[200px] text-xs">
+                                  Enable this for hierarchical categories like brand systems that need grouping
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <Checkbox
+                            id={`nets-${column.index}`}
+                            checked={columnSettings[column.index]?.hasNets || false}
+                            onCheckedChange={(checked) => handleNetsSettingChange(column.index, !!checked)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -142,8 +232,18 @@ const ColumnSelector: React.FC = () => {
             <span>{selectedCount} column{selectedCount !== 1 ? 's' : ''} selected</span>
           </div>
           
+          {selectedCount > 0 && getSelectedTypes().length > 0 && (
+            <div className="flex gap-1 items-center">
+              {getSelectedTypes().map(typeInfo => (
+                <Badge key={typeInfo.type} variant="outline" className="text-xs">
+                  {typeInfo.label}: {typeInfo.count}
+                </Badge>
+              ))}
+            </div>
+          )}
+          
           {!activeCodeframe && (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="ml-auto md:ml-0">
               <Link to="/upload-codeframe" className="flex items-center gap-2">
                 <FileCode className="h-4 w-4" />
                 <span>Upload Codeframe</span>

@@ -10,6 +10,9 @@ let userSelectedColumns: ColumnInfo[] = [];
 // Store uploaded codeframe if provided
 let userUploadedCodeframe: UploadedCodeframe | null = null;
 
+// Store column question types
+let userColumnQuestionTypes: Record<number, string> = {};
+
 // Set selected columns - renamed to avoid naming conflicts in ProcessingContext
 export const setApiSelectedColumns = (columns: ColumnInfo[]): void => {
   userSelectedColumns = columns;
@@ -18,6 +21,11 @@ export const setApiSelectedColumns = (columns: ColumnInfo[]): void => {
 // Set uploaded codeframe for use in API
 export const setUploadedCodeframe = (codeframe: UploadedCodeframe | null): void => {
   userUploadedCodeframe = codeframe;
+};
+
+// Set column question types
+export const setColumnQuestionTypes = (columnTypes: Record<number, string>): void => {
+  userColumnQuestionTypes = columnTypes;
 };
 
 // Test API connection with provided key
@@ -221,7 +229,113 @@ const ensureOtherCategory = (codeframe: any[]) => {
   }];
 };
 
-// Get the processing result
+// Generate codeframe for a specific question type
+const generatePromptByQuestionType = (questionType: string, columns: any[], uploadedCodeframe: UploadedCodeframe | null) => {
+  let promptContent = "";
+  
+  // If user uploaded a codeframe, include it in the prompt
+  if (uploadedCodeframe) {
+    promptContent = `I have a survey with the following open-ended questions and responses:
+    ${JSON.stringify(columns, null, 2)}
+    
+    I already have a predefined codeframe that I want you to use to code these responses:
+    ${JSON.stringify(uploadedCodeframe.entries, null, 2)}
+    
+    Please analyze these responses and:
+    1. Use ONLY the provided codeframe codes - do not create new ones
+    2. Assign the appropriate codes to each response based on the definitions in the codeframe
+    3. Make sure to include the "Other" category for responses that don't fit any category
+    
+    Format your response as a JSON object with two properties:
+    - codeframe: The provided codeframe array of code objects with {code, numeric, label, definition, examples}
+    - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
+    
+    return promptContent;
+  }
+
+  // Create different prompts based on question type
+  switch (questionType) {
+    case 'brand_awareness':
+      promptContent = `I have survey responses from Unaided Brand Awareness questions where respondents listed brands they are aware of:
+      ${JSON.stringify(columns, null, 2)}
+      
+      Please analyze these responses and:
+      1. Create a codeframe with distinct brand codes
+      2. Group related brands under parent systems/categories where appropriate
+      3. Include an "Other" category for mentions that don't fit main brands
+      4. For each code, provide:
+         - A short label (the brand name)
+         - A clear definition including parent company if applicable
+         - A numeric code
+         - Sample mentions that would be coded to this brand
+      5. If you detect brand hierarchies, create parent codes (e.g., "Hospital System") and child codes (individual hospitals)
+      
+      Format your response as a JSON object with:
+      - codeframe: Array of code objects with {code, numeric, label, definition, examples, parentCode}
+      - codedResponses: Array of response objects with {responseText, columnName, columnIndex, codesAssigned}
+      - brandHierarchies: Object mapping parent codes to arrays of child codes`;
+      break;
+      
+    case 'brand_description':
+      promptContent = `I have survey responses from Brand Description questions where respondents described brands:
+      ${JSON.stringify(columns, null, 2)}
+      
+      Please analyze these responses and:
+      1. Create a codeframe with attribute categories (like Quality, Value, Innovation)
+      2. Include sentiment dimensions (Positive, Negative, Neutral) where appropriate
+      3. Always include an "Other" category
+      4. For each code, provide:
+         - A short label for the attribute
+         - A clear definition of what this attribute represents
+         - A numeric code
+         - Example phrases from the responses
+      5. Group related attributes under themes where possible
+      
+      Format your response as a JSON object with:
+      - codeframe: Array of code objects with {code, numeric, label, definition, examples, themeGroup}
+      - codedResponses: Array of objects with {responseText, columnName, columnIndex, codesAssigned}
+      - attributeThemes: Object mapping themes to arrays of attribute codes`;
+      break;
+      
+    case 'miscellaneous':
+    default:
+      promptContent = `I have a survey with the following open-ended questions and responses:
+      ${JSON.stringify(columns, null, 2)}
+      
+      Please analyze these responses and:
+      1. Create a codeframe with 5-10 distinct codes using numeric identifiers
+      2. Always include an "Other" category for responses that don't clearly fit other categories
+      3. For each code, provide:
+         - A short label
+         - A clear definition
+         - A numeric code (e.g., 1, 2, 3 or 1.1, 1.2, etc.)
+         - 2-3 example phrases
+      4. Assign appropriate codes to each response
+      
+      Format your response as a JSON object with two properties:
+      - codeframe: An array of code objects with {code, numeric, label, definition, examples}
+      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
+  }
+  
+  return promptContent;
+};
+
+// Generate insights based on coded results
+const generateInsightsPrompt = (questionTypes: string[], codedResponses: any, codeframes: any) => {
+  return `Based on the analysis of the survey responses across ${questionTypes.length} question types:
+  
+  ${JSON.stringify({questionTypes, codedResponses, codeframes}, null, 2)}
+  
+  Please provide a high-level summary of key findings and insights:
+  1. For each question type, identify the top 3-5 themes/patterns
+  2. Highlight any notable correlations or contrasts between different question types
+  3. Summarize the overall sentiment and main takeaways from the responses
+  4. Suggest potential follow-up areas for deeper analysis
+  
+  Format your response as markdown text with clear section headers for each question type.`;
+};
+
+// Get the processing result with multiple codeframes
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
     // If no API key is provided, fall back to mock data
@@ -237,153 +351,202 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       throw new Error("No columns selected for processing");
     }
     
-    // Extract examples from selected columns to send to the API
-    const selectedColumnsData = [];
+    // Group columns by question type
+    const columnsByType: Record<string, any[]> = {};
     
     for (const columnInfo of userSelectedColumns) {
+      const questionType = userColumnQuestionTypes[columnInfo.index] || 'miscellaneous';
+      
+      if (!columnsByType[questionType]) {
+        columnsByType[questionType] = [];
+      }
+      
       // Get all responses for this column, not just examples
-      const allColumnResponses = columnInfo.examples || [];
+      const columnData = {
+        name: columnInfo.name,
+        index: columnInfo.index,
+        responses: columnInfo.examples || [],
+        settings: columnInfo.settings || {} // Include any settings like hasNets
+      };
       
-      // Only add columns that have some responses
-      if (allColumnResponses.length > 0) {
-        selectedColumnsData.push({
-          name: columnInfo.name,
-          index: columnInfo.index,
-          responses: allColumnResponses
-        });
+      columnsByType[questionType].push(columnData);
+    }
+    
+    console.log("Columns grouped by question type:", Object.keys(columnsByType));
+    
+    // Process each question type separately
+    const promises = Object.entries(columnsByType).map(async ([questionType, columns]) => {
+      // Create a prompt for this question type
+      const promptContent = generatePromptByQuestionType(questionType, columns, userUploadedCodeframe);
+      
+      const messages = [
+        {
+          role: "system",
+          content: `You are an expert qualitative researcher analyzing ${questionType} type survey responses.`
+        },
+        {
+          role: "user",
+          content: promptContent
+        }
+      ];
+      
+      // Make the API call to OpenAI
+      const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiConfig.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: messages,
+          temperature: 0.7,
+          max_tokens: 4000,
+          response_format: { type: "json_object" }
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || errorData.message || `Processing failed with status ${response.status}`);
       }
-    }
-    
-    // If no columns with responses were found, throw an error
-    if (selectedColumnsData.length === 0) {
-      throw new Error("Selected columns don't contain any responses to analyze");
-    }
-    
-    console.log("Sending selected column data to OpenAI:", selectedColumnsData);
-    
-    // Create a prompt for OpenAI to analyze the data
-    let promptContent = "";
-    
-    // If user uploaded a codeframe, include it in the prompt
-    if (userUploadedCodeframe) {
-      promptContent = `I have a survey with the following open-ended questions and responses:
-      ${JSON.stringify(selectedColumnsData, null, 2)}
       
-      I already have a predefined codeframe that I want you to use to code these responses:
-      ${JSON.stringify(userUploadedCodeframe.entries, null, 2)}
+      const data = await response.json();
       
-      Please analyze these responses and:
-      1. Use ONLY the provided codeframe codes - do not create new ones
-      2. Assign the appropriate codes to each response based on the definitions in the codeframe
-      3. Make sure to include the "Other" category for responses that don't fit any category
-      
-      Format your response as a JSON object with two properties:
-      - codeframe: The provided codeframe array of code objects with {code, numeric, label, definition, examples}
-      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
-    } else {
-      // Otherwise use the default prompt to generate a new codeframe
-      promptContent = `I have a survey with the following open-ended questions and responses:
-      ${JSON.stringify(selectedColumnsData, null, 2)}
-      
-      Please analyze these responses and:
-      1. Create a codeframe with 5-8 distinct codes using numeric identifiers
-      2. Always include an "Other" category for responses that don't clearly fit other categories
-      3. For each code, provide:
-         - A short label
-         - A clear definition
-         - A numeric code (e.g., 1, 2, 3 or 1.1, 1.2, etc.)
-         - 2-3 example phrases
-      4. Assign appropriate codes to each response
-      
-      Format your response as a JSON object with two properties:
-      - codeframe: An array of code objects with {code, numeric, label, definition, examples}
-      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
-    }
-    
-    const messages = [
-      {
-        role: "system",
-        content: `You are an expert qualitative researcher analyzing open-ended survey responses.`
-      },
-      {
-        role: "user",
-        content: promptContent
-      }
-    ];
-    
-    // Make the API call to OpenAI - Fix: Ensure we're using the correct API key format
-    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiConfig.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 4000,
-        response_format: { type: "json_object" } // Request JSON format explicitly
-      })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || errorData.message || `Processing failed with status ${response.status}`);
-    }
-    
-    const data = await response.json();
-    console.log("OpenAI response:", data);
-    
-    try {
-      // Parse the content from the OpenAI response
-      const content = data.choices[0].message.content;
-      let parsedResult;
-      
-      // Attempt to parse the JSON
       try {
-        parsedResult = JSON.parse(content);
-      } catch (jsonError) {
-        console.error("Failed to parse JSON directly:", jsonError);
+        // Parse the content from the OpenAI response
+        const content = data.choices[0].message.content;
+        let parsedResult;
         
-        // If content isn't valid JSON, fall back to mock data
-        console.warn("OpenAI didn't return valid JSON, falling back to mock data");
-        return mockGetProcessingResult(fileId);
-      }
-      
-      // Validate the parsed result structure
-      if (!parsedResult.codeframe || !Array.isArray(parsedResult.codeframe) || 
-          !parsedResult.codedResponses || !Array.isArray(parsedResult.codedResponses)) {
-        console.warn("OpenAI response doesn't have the expected structure, falling back to mock data");
-        return mockGetProcessingResult(fileId);
-      }
-      
-      // Ensure codeframe has numeric codes
-      const codeframeWithNumeric = ensureNumericCodes(parsedResult.codeframe);
-      
-      // Ensure "Other" category exists
-      const codeframeWithOther = ensureOtherCategory(codeframeWithNumeric);
-      
-      // Calculate code percentages
-      const { updatedCodeframe, codeSummary } = calculateCodePercentages(
-        parsedResult.codedResponses, 
-        codeframeWithOther
-      );
-      
-      // Return the processed result
-      return {
-        success: true,
-        data: {
+        try {
+          parsedResult = JSON.parse(content);
+        } catch (jsonError) {
+          console.error("Failed to parse JSON for question type", questionType, jsonError);
+          return null;
+        }
+        
+        // Validate the parsed result structure
+        if (!parsedResult.codeframe || !Array.isArray(parsedResult.codeframe) || 
+            !parsedResult.codedResponses || !Array.isArray(parsedResult.codedResponses)) {
+          console.warn("OpenAI response doesn't have the expected structure for question type", questionType);
+          return null;
+        }
+        
+        // Ensure codeframe has numeric codes
+        const codeframeWithNumeric = ensureNumericCodes(parsedResult.codeframe);
+        
+        // Ensure "Other" category exists
+        const codeframeWithOther = ensureOtherCategory(codeframeWithNumeric);
+        
+        // Calculate code percentages
+        const { updatedCodeframe, codeSummary } = calculateCodePercentages(
+          parsedResult.codedResponses, 
+          codeframeWithOther
+        );
+        
+        // Return the processed result for this question type
+        return {
+          questionType,
           codeframe: updatedCodeframe,
           codedResponses: parsedResult.codedResponses,
           codeSummary: codeSummary,
-          status: 'complete'
-        }
-      };
-    } catch (error) {
-      console.error("Error handling OpenAI response:", error);
-      throw new Error("Failed to parse analysis results from OpenAI");
+          // Include special data if available
+          brandHierarchies: parsedResult.brandHierarchies,
+          attributeThemes: parsedResult.attributeThemes
+        };
+      } catch (error) {
+        console.error("Error handling OpenAI response for question type", questionType, error);
+        return null;
+      }
+    });
+    
+    // Wait for all question types to be processed
+    const results = (await Promise.all(promises)).filter(Boolean);
+    
+    if (results.length === 0) {
+      throw new Error("Failed to process any question types");
     }
+    
+    // Combine results from all question types
+    const allCodedResponses: any[] = [];
+    const multipleCodeframes: Record<string, any> = {};
+    
+    results.forEach(result => {
+      if (!result) return;
+      
+      // Add these coded responses to the combined list
+      allCodedResponses.push(...result.codedResponses);
+      
+      // Store the codeframe and summary by question type
+      multipleCodeframes[result.questionType] = {
+        codeframe: result.codeframe,
+        codeSummary: result.codeSummary,
+        brandHierarchies: result.brandHierarchies,
+        attributeThemes: result.attributeThemes
+      };
+    });
+    
+    // Use the first result as the "primary" one for backward compatibility
+    const primaryResult = results[0];
+    
+    // Generate insights if there are multiple question types
+    let insights = null;
+    if (results.length > 1) {
+      try {
+        // Generate insights across question types
+        const insightsPrompt = generateInsightsPrompt(
+          Object.keys(multipleCodeframes),
+          allCodedResponses,
+          multipleCodeframes
+        );
+        
+        const insightsResponse = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiConfig.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert data analyst providing insights on survey results."
+              },
+              {
+                role: "user",
+                content: insightsPrompt
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000
+          })
+        });
+        
+        if (insightsResponse.ok) {
+          const insightsData = await insightsResponse.json();
+          insights = insightsData.choices[0].message.content;
+        }
+      } catch (error) {
+        console.error("Failed to generate insights:", error);
+        // Continue without insights if generation fails
+      }
+    }
+    
+    // Return the combined result
+    return {
+      success: true,
+      data: {
+        // Primary codeframe and responses for backward compatibility
+        codeframe: primaryResult.codeframe,
+        codedResponses: allCodedResponses,
+        codeSummary: primaryResult.codeSummary,
+        // New multi-codeframe structure
+        multipleCodeframes,
+        insights,
+        status: 'complete'
+      }
+    };
   } catch (error) {
     console.error("Getting processing results failed:", error);
     return {
@@ -571,52 +734,167 @@ const mockGetProcessingResult = async (fileId: string): Promise<ApiResponse<Proc
   };
 };
 
-// Function to generate an Excel file from the results
+// Function to generate an Excel file from the results with multiple codeframes
 export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> => {
   try {
     // Create a new workbook
     const workbook = XLSX.utils.book_new();
     
-    // Create the Codeframe worksheet
-    const codeframeData = result.codeframe.map(code => ({
-      Code: code.code,
-      Numeric: code.numeric || '',
-      Label: code.label,
-      Definition: code.definition,
-      Examples: code.examples.join('; '),
-      Count: code.count || 0,
-      Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%'
-    }));
-    const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
-    XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, "Codeframe");
+    // Check for multiple codeframes
+    const hasMultipleCodeframes = result.multipleCodeframes && 
+      Object.keys(result.multipleCodeframes).length > 0;
     
-    // Create the Code Summary worksheet
-    if (result.codeSummary) {
-      const summaryData = result.codeSummary.map(code => ({
+    // Add overall summary tab if we have insights
+    if (result.insights) {
+      // Convert the insights markdown to a format suitable for Excel
+      const insightRows = result.insights.split('\n').map(line => [line]);
+      const insightsWorksheet = XLSX.utils.aoa_to_sheet(insightRows);
+      XLSX.utils.book_append_sheet(workbook, insightsWorksheet, "Analysis Insights");
+    }
+    
+    // If we have multiple codeframes, create a worksheet for each question type
+    if (hasMultipleCodeframes) {
+      Object.entries(result.multipleCodeframes).forEach(([questionType, typeData]) => {
+        // Create readable question type name
+        const questionTypeName = questionType === 'brand_awareness' ? 'Brand Awareness' : 
+                                questionType === 'brand_description' ? 'Brand Description' : 
+                                'Miscellaneous';
+                                
+        // Create codeframe worksheet for this question type
+        if (typeData.codeframe) {
+          const codeframeData = typeData.codeframe.map((code: any) => ({
+            Code: code.code,
+            Numeric: code.numeric || '',
+            Label: code.label,
+            Definition: code.definition,
+            Examples: (code.examples || []).join('; '),
+            Count: code.count || 0,
+            Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%',
+            ...(code.parentCode ? { ParentCode: code.parentCode } : {}),
+            ...(code.themeGroup ? { Theme: code.themeGroup } : {})
+          }));
+          
+          const typeCodeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
+          XLSX.utils.book_append_sheet(workbook, typeCodeframeWorksheet, `${questionTypeName} Codes`);
+        }
+        
+        // Create code summary worksheet for this question type
+        if (typeData.codeSummary) {
+          const summaryData = typeData.codeSummary.map((code: any) => ({
+            Code: code.code,
+            Numeric: code.numeric || '',
+            Label: code.label,
+            Count: code.count,
+            Percentage: `${code.percentage.toFixed(1)}%`
+          }));
+          
+          const typeSummaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+          XLSX.utils.book_append_sheet(workbook, typeSummaryWorksheet, `${questionTypeName} Summary`);
+        }
+        
+        // Add brand hierarchies if available
+        if (questionType === 'brand_awareness' && typeData.brandHierarchies) {
+          const hierarchyData: any[] = [];
+          
+          Object.entries(typeData.brandHierarchies).forEach(([parent, children]) => {
+            hierarchyData.push({ ParentSystem: parent, ChildBrand: '', Count: '' });
+            (children as string[]).forEach(child => {
+              const childCode = typeData.codeframe.find((c: any) => c.code === child);
+              hierarchyData.push({ 
+                ParentSystem: '',
+                ChildBrand: childCode?.label || child,
+                Count: childCode?.count || 0
+              });
+            });
+          });
+          
+          if (hierarchyData.length > 0) {
+            const hierarchyWorksheet = XLSX.utils.json_to_sheet(hierarchyData);
+            XLSX.utils.book_append_sheet(workbook, hierarchyWorksheet, "Brand Hierarchies");
+          }
+        }
+        
+        // Add attribute themes if available
+        if (questionType === 'brand_description' && typeData.attributeThemes) {
+          const themeData: any[] = [];
+          
+          Object.entries(typeData.attributeThemes).forEach(([theme, attributes]) => {
+            themeData.push({ Theme: theme, Attribute: '', Count: '' });
+            (attributes as string[]).forEach(attr => {
+              const attrCode = typeData.codeframe.find((c: any) => c.code === attr);
+              themeData.push({ 
+                Theme: '',
+                Attribute: attrCode?.label || attr,
+                Count: attrCode?.count || 0
+              });
+            });
+          });
+          
+          if (themeData.length > 0) {
+            const themeWorksheet = XLSX.utils.json_to_sheet(themeData);
+            XLSX.utils.book_append_sheet(workbook, themeWorksheet, "Attribute Themes");
+          }
+        }
+      });
+    } else {
+      // If no multiple codeframes, keep the original codeframe worksheet
+      const codeframeData = result.codeframe.map(code => ({
         Code: code.code,
         Numeric: code.numeric || '',
         Label: code.label,
-        Count: code.count,
-        Percentage: `${code.percentage.toFixed(1)}%`
+        Definition: code.definition,
+        Examples: (code.examples || []).join('; '),
+        Count: code.count || 0,
+        Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%'
       }));
-      const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Code Summary");
+      
+      const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
+      XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, "Codeframe");
+      
+      // Add the Code Summary worksheet if available
+      if (result.codeSummary) {
+        const summaryData = result.codeSummary.map(code => ({
+          Code: code.code,
+          Numeric: code.numeric || '',
+          Label: code.label,
+          Count: code.count,
+          Percentage: `${code.percentage.toFixed(1)}%`
+        }));
+        
+        const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Code Summary");
+      }
     }
     
-    // Create the Coded Responses worksheet
+    // Create the Coded Responses worksheet (this always contains all responses)
     const responsesData = result.codedResponses.map(response => ({
       Response: response.responseText,
       Column: response.columnName || 'Unknown',
+      QuestionType: hasMultipleCodeframes ? 
+        userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' : 
+        'N/A',
       Codes: response.codesAssigned.join('; '),
       NumericCodes: response.codesAssigned.map(code => {
-        const codeEntry = result.codeframe.find(c => c.code === code);
+        // Find the code in the appropriate codeframe based on question type
+        const questionType = hasMultipleCodeframes ? 
+          userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' :
+          '';
+          
+        let codeEntry;
+        if (hasMultipleCodeframes && questionType && result.multipleCodeframes[questionType]) {
+          codeEntry = result.multipleCodeframes[questionType].codeframe.find((c: any) => c.code === code);
+        } else {
+          codeEntry = result.codeframe.find(c => c.code === code);
+        }
+        
         return codeEntry ? codeEntry.numeric || code : code;
       }).join('; ')
     }));
+    
     const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
     XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
     
-    // Create column-specific worksheets if we have column information
+    // Create column-specific worksheets
     const columnResponses = new Map<string, any[]>();
     
     // Group responses by column
@@ -626,27 +904,46 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
         if (!columnResponses.has(key)) {
           columnResponses.set(key, []);
         }
+        
+        // Determine which codeframe to use for this response
+        const questionType = hasMultipleCodeframes ? 
+          userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' :
+          '';
+          
+        const codes = response.codesAssigned.map(code => {
+          let codeEntry;
+          if (hasMultipleCodeframes && questionType && result.multipleCodeframes[questionType]) {
+            codeEntry = result.multipleCodeframes[questionType].codeframe.find((c: any) => c.code === code);
+          } else {
+            codeEntry = result.codeframe.find(c => c.code === code);
+          }
+          
+          return codeEntry ? `${codeEntry.numeric || ''} - ${codeEntry.label}` : code;
+        }).join('; ');
+        
         columnResponses.get(key)?.push({
           Response: response.responseText,
-          Codes: response.codesAssigned.map(code => {
-            const codeEntry = result.codeframe.find(c => c.code === code);
-            return codeEntry ? `${codeEntry.numeric || ''} - ${codeEntry.label}` : code;
-          }).join('; ')
+          QuestionType: hasMultipleCodeframes ? 
+            (questionType === 'brand_awareness' ? 'Brand Awareness' : 
+             questionType === 'brand_description' ? 'Brand Description' : 
+             'Miscellaneous') : 
+            'N/A',
+          Codes: codes
         });
       }
     });
     
     // Create a worksheet for each column
     columnResponses.forEach((responses, columnName) => {
-      const safeSheetName = columnName.substring(0, 30).replace(/[*?[\]]/g, '_'); // Ensure valid worksheet name
+      const safeSheetName = columnName.substring(0, 30).replace(/[*?[\]]/g, '_');
       const worksheet = XLSX.utils.json_to_sheet(responses);
       XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
     });
     
-    // Write the workbook to an array buffer instead of binary string
+    // Write the workbook to an array buffer
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     
-    // Create a Blob from the ArrayBuffer with the correct MIME type
+    // Create a Blob from the ArrayBuffer
     return new Blob([excelBuffer], { 
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     });

@@ -9,10 +9,17 @@ import {
   testApiConnection, 
   setUserResponses,
   setApiSelectedColumns,
-  setUploadedCodeframe as setApiUploadedCodeframe
+  setUploadedCodeframe as setApiUploadedCodeframe,
+  setColumnQuestionTypes as setApiColumnQuestionTypes
 } from '../services/api';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+
+export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellaneous';
+export type ColumnSetting = {
+  hasNets?: boolean;
+  isMultiResponse?: boolean;
+};
 
 interface ProcessingContextType {
   uploadedFile: UploadedFile | null;
@@ -31,6 +38,10 @@ interface ProcessingContextType {
   uploadedCodeframe: UploadedCodeframe | null;
   activeCodeframe: UploadedCodeframe | null;
   rawFileData: any[][] | null;
+  columnQuestionTypes: Record<number, QuestionType>;
+  columnSettings: Record<number, ColumnSetting>;
+  multipleCodeframes: Record<string, any> | null;
+  insights: string | null;
   setApiConfig: (config: ApiConfig) => void;
   testApiConnection: (apiKey: string, apiUrl: string) => Promise<boolean>;
   handleFileUpload: (file: File) => Promise<void>;
@@ -41,6 +52,8 @@ interface ProcessingContextType {
   setSearchQuery: (query: string) => void;
   saveUploadedCodeframe: (codeframe: UploadedCodeframe) => void;
   setActiveCodeframe: (codeframe: UploadedCodeframe | null) => void;
+  setColumnQuestionType: (columnIndex: number, questionType: string) => void;
+  updateColumnSetting: (columnIndex: number, setting: string, value: any) => void;
 }
 
 const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
@@ -61,6 +74,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [uploadedCodeframes, setUploadedCodeframes] = useState<UploadedCodeframe[]>([]);
   const [activeCodeframe, setActiveCodeframe] = useState<UploadedCodeframe | null>(null);
   const [rawFileData, setRawFileData] = useState<any[][] | null>(null);
+  const [columnQuestionTypes, setColumnQuestionTypes] = useState<Record<number, QuestionType>>({});
+  const [columnSettings, setColumnSettings] = useState<Record<number, ColumnSetting>>({});
+  const [multipleCodeframes, setMultipleCodeframes] = useState<Record<string, any> | null>(null);
+  const [insights, setInsights] = useState<string | null>(null);
 
   // Analyze a sample of values to determine column type and statistics
   const analyzeColumnValues = (values: any[]): { 
@@ -479,6 +496,25 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
+  // Set column question type
+  const setColumnQuestionType = (columnIndex: number, questionType: string) => {
+    setColumnQuestionTypes(prev => ({
+      ...prev,
+      [columnIndex]: questionType as QuestionType
+    }));
+  };
+
+  // Update column setting (like hasNets, isMultiResponse)
+  const updateColumnSetting = (columnIndex: number, setting: string, value: any) => {
+    setColumnSettings(prev => ({
+      ...prev,
+      [columnIndex]: {
+        ...(prev[columnIndex] || {}),
+        [setting]: value
+      }
+    }));
+  };
+
   // Toggle column selection
   const toggleColumnSelection = (columnIndex: number) => {
     setSelectedColumns(prev => {
@@ -567,7 +603,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  // Start processing the uploaded file
+  // Start processing the uploaded file with multiple question types
   const startProcessing = async () => {
     if (!uploadedFile || !uploadedFile.id) {
       toast({
@@ -593,13 +629,23 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       setProcessingProgress(10);
       
       // Get the selected column info objects from fileColumns
-      const selectedColumnsInfo = selectedColumns.map(index => 
-        fileColumns.find(col => col.index === index)
-      ).filter(Boolean) as ColumnInfo[];
+      const selectedColumnsInfo = selectedColumns.map(index => {
+        const columnInfo = fileColumns.find(col => col.index === index);
+        if (columnInfo) {
+          return {
+            ...columnInfo,
+            questionType: columnQuestionTypes[index] || 'miscellaneous',
+            settings: columnSettings[index] || {}
+          };
+        }
+        return null;
+      }).filter(Boolean) as (ColumnInfo & { questionType: string, settings: ColumnSetting })[];
       
       // Call the API service function to store the column info
-      // We use a different name for the imported function to avoid confusion
       setApiSelectedColumns(selectedColumnsInfo);
+      
+      // Send question types to API service
+      setApiColumnQuestionTypes(columnQuestionTypes);
       
       const response = await processFile(uploadedFile.id, apiConfig || undefined);
       
@@ -621,16 +667,16 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  // Poll for processing results
+  // Poll for processing results with support for multiple codeframes
   const pollForResults = async (fileId: string) => {
     try {
-      setProcessingStatus('Analyzing responses...');
+      setProcessingStatus('Analyzing responses by question type...');
       setProcessingProgress(30);
       
       // Wait for a bit to simulate processing time
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      setProcessingStatus('Generating codeframe...');
+      setProcessingStatus('Generating codeframes...');
       setProcessingProgress(60);
       
       // Wait again to simulate the next processing step
@@ -650,12 +696,23 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       }
       
       setResults(response.data);
+      
+      // Store multiple codeframes if available
+      if (response.data.multipleCodeframes) {
+        setMultipleCodeframes(response.data.multipleCodeframes);
+      }
+      
+      // Store insights if available
+      if (response.data.insights) {
+        setInsights(response.data.insights);
+      }
+      
       setProcessingProgress(100);
       setProcessingStatus('Analysis complete!');
       
       toast({
         title: "Analysis Complete",
-        description: `Successfully analyzed ${response.data.codedResponses.length} responses from ${selectedColumns.length} columns`,
+        description: `Successfully analyzed ${response.data.codedResponses.length} responses across ${Object.keys(columnQuestionTypes).length || 1} question types`,
       });
     } catch (error) {
       toast({
@@ -724,6 +781,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setSelectedColumns([]);
     setSearchQuery('');
     setRawFileData(null);
+    setMultipleCodeframes(null);
+    setInsights(null);
     // Note: We don't reset the API config and uploaded codeframes on purpose
   };
 
@@ -744,6 +803,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     uploadedCodeframe: activeCodeframe,
     activeCodeframe,
     rawFileData,
+    columnQuestionTypes,
+    columnSettings,
+    multipleCodeframes,
+    insights,
     setApiConfig,
     testApiConnection: handleTestApiConnection,
     handleFileUpload,
@@ -753,7 +816,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     toggleColumnSelection,
     setSearchQuery,
     saveUploadedCodeframe,
-    setActiveCodeframe
+    setActiveCodeframe,
+    setColumnQuestionType,
+    updateColumnSetting
   };
 
   return (
