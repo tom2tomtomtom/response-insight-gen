@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
@@ -11,18 +12,10 @@ import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { ColumnInfo } from '../types';
 import CodeSummaryChart from './CodeSummary';
 import { toast } from './ui/use-toast';
-import { getQuestionTypeName } from '../utils/questionTypes';
+import { getQuestionTypeName, getQuestionTypeIcon } from '../utils/questionTypes';
 import InsightsPanel from './InsightsPanel';
 
-// Helper to get human-readable question type name
-const getQuestionTypeName = (questionType: string): string => {
-  switch (questionType) {
-    case 'brand_awareness': return 'Unaided Brand Awareness';
-    case 'brand_description': return 'Brand Description';
-    case 'miscellaneous': return 'Miscellaneous';
-    default: return questionType.charAt(0).toUpperCase() + questionType.slice(1).replace('_', ' ');
-  }
-};
+// Remove the conflicting local function that defines getQuestionTypeName
 
 const ResultsView: React.FC = () => {
   const { 
@@ -179,17 +172,7 @@ const ResultsView: React.FC = () => {
       </CardHeader>
       <CardContent>
         {/* Show insights if available */}
-        {insights && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-md">
-            <div className="flex items-center gap-2 mb-2">
-              <MessageSquare className="h-4 w-4 text-blue-500" />
-              <h3 className="font-medium">Key Insights</h3>
-            </div>
-            <div className="text-sm prose max-w-none">
-              <pre className="whitespace-pre-wrap text-sm font-sans">{insights}</pre>
-            </div>
-          </div>
-        )}
+        {insights && <InsightsPanel insights={insights} />}
       
         {/* Add Code Summary Chart if we have code summary data */}
         {currentCodeSummary && currentCodeSummary.length > 0 && (

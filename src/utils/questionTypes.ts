@@ -61,3 +61,10 @@ export const getQuestionTypeIcon = (type: string): string => {
   }
   return '📝';
 };
+
+export const getPromptInstructions = (type: string): string => {
+  if (type in QUESTION_TYPES) {
+    return QUESTION_TYPES[type as QuestionType].promptInstructions;
+  }
+  return '';
+};

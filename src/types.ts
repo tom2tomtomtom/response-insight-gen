@@ -31,12 +31,32 @@ export interface CodeSummary {
   percentage: number;
 }
 
+// Add interfaces for the specialized data structures
+export interface BrandHierarchy {
+  [parentSystem: string]: string[];
+}
+
+export interface AttributeTheme {
+  [theme: string]: string[];
+}
+
+// Add interface for question-type specific codeframe data
+export interface QuestionTypeCodeframe {
+  codeframe: CodeframeEntry[];
+  codeSummary: CodeSummary[];
+  brandHierarchies?: BrandHierarchy; // For brand awareness questions
+  attributeThemes?: AttributeTheme; // For brand description questions
+}
+
 export interface ProcessedResult {
   codeframe: CodeframeEntry[];
   codedResponses: CodedResponse[];
   codeSummary: CodeSummary[]; // Add summary stats for codes
   status: 'complete' | 'processing' | 'failed';
   error?: string;
+  // Add the new properties
+  multipleCodeframes?: Record<string, QuestionTypeCodeframe>;
+  insights?: string; // For AI-generated commentary
 }
 
 export interface ApiResponse<T> {
@@ -65,6 +85,12 @@ export interface ColumnInfo {
   type: 'text' | 'numeric' | 'mixed' | 'empty'; // Type of data in the column
   examples: string[]; // Example values (first few values)
   stats: ColumnStats; // Statistics about the column
+  settings?: ColumnSetting; // Add settings property
+}
+
+export interface ColumnSetting {
+  hasNets?: boolean;
+  isMultiResponse?: boolean;
 }
 
 export interface UploadedCodeframe {
