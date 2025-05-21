@@ -7,6 +7,17 @@ interface InsightsPanelProps {
 }
 
 const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights }) => {
+  // Function to clean markdown syntax from text
+  const cleanMarkdown = (text: string) => {
+    return text
+      .replace(/#+\s?/g, '') // Remove heading markers (# ## ###)
+      .replace(/\*\*/g, '')   // Remove bold markers (**)
+      .replace(/\*/g, '')     // Remove italic markers (*)
+      .replace(/_{1,2}/g, ''); // Remove underscore markers (_ or __)
+  };
+
+  const cleanedInsights = cleanMarkdown(insights);
+
   return (
     <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-md dark:bg-blue-950 dark:border-blue-900">
       <div className="flex items-center gap-2 mb-2">
@@ -14,7 +25,7 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights }) => {
         <h3 className="font-medium">Key Insights</h3>
       </div>
       <div className="text-sm prose max-w-none dark:prose-invert">
-        <pre className="whitespace-pre-wrap text-sm font-sans">{insights}</pre>
+        <pre className="whitespace-pre-wrap text-sm font-sans">{cleanedInsights}</pre>
       </div>
     </div>
   );
