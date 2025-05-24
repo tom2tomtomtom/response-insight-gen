@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo, UploadedCodeframe } from '../types';
+import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { 
   uploadFile, 
@@ -15,14 +15,8 @@ import {
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
+import { debugLog } from '../utils/debug';
 export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellaneous';
-export type ColumnSetting = {
-  hasNets?: boolean;
-  isMultiResponse?: boolean;
-};
-
-interface ProcessingContextType {
-  uploadedFile: UploadedFile | null;
   isUploading: boolean;
   isProcessing: boolean;
   processingStatus: string;
@@ -54,7 +48,7 @@ interface ProcessingContextType {
   saveUploadedCodeframe: (codeframe: UploadedCodeframe) => void;
   setActiveCodeframe: (codeframe: UploadedCodeframe | null) => void;
   setColumnQuestionType: (columnIndex: number, questionType: string) => void;
-  updateColumnSetting: (columnIndex: number, setting: string, value: any) => void;
+  updateColumnSetting: (columnIndex: number, setting: keyof ColumnSetting, value: boolean) => void;
 }
 
 const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
@@ -185,12 +179,12 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       reader.onload = (e) => {
         try {
-          console.log("Reading Excel file data...");
+          debugLog("Reading Excel file data...");
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
           
           // Debug available sheets
-          console.log("Available sheets:", workbook.SheetNames);
+          debugLog("Available sheets:", workbook.SheetNames);
           
           if (workbook.SheetNames.length === 0) {
             reject(new Error('No worksheets found in the Excel file'));
@@ -202,12 +196,12 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
           const worksheet = workbook.Sheets[firstSheetName];
           
           // Debug worksheet structure
-          console.log("Worksheet range:", worksheet['!ref']);
+          debugLog("Worksheet range:", worksheet['!ref']);
           
           // Convert to JSON with header option
           const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1, defval: "" });
           
-          console.log("Excel rows found:", jsonData.length);
+          debugLog("Excel rows found:", jsonData.length);
           
           if (jsonData.length === 0) {
             reject(new Error('No data rows found in the Excel file'));
@@ -320,7 +314,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
           // Remove auto-selection of columns - start with empty selection
           setSelectedColumns([]);
           
-          console.log(`Found ${columnInfos.length} columns, but none automatically selected`);
+          debugLog(`Found ${columnInfos.length} columns, but none automatically selected`);
           
           // Return both column info and text responses
           resolve({ 
@@ -350,7 +344,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         skipEmptyLines: true,
         complete: (results) => {
           try {
-            console.log("CSV parsing results:", results);
+            debugLog("CSV parsing results:", results);
             
             if (!results.data || results.data.length === 0) {
               reject(new Error('No data found in the CSV file'));
@@ -457,7 +451,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
             // Remove auto-selection of columns - start with empty selection
             setSelectedColumns([]);
             
-            console.log(`Found ${columnInfos.length} columns, but none automatically selected`);
+            debugLog(`Found ${columnInfos.length} columns, but none automatically selected`);
             
             // Return both column info and text responses
             resolve({ 
@@ -506,7 +500,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // Update column setting (like hasNets, isMultiResponse)
-  const updateColumnSetting = (columnIndex: number, setting: string, value: any) => {
+  const updateColumnSetting = (columnIndex: number, setting: keyof ColumnSetting, value: boolean) => {
     setColumnSettings(prev => ({
       ...prev,
       [columnIndex]: {
@@ -563,10 +557,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       // Parse file based on type
       if (file.name.toLowerCase().endsWith('.csv')) {
-        console.log("Parsing CSV file:", file.name);
+        debugLog("Parsing CSV file:", file.name);
         parseResult = await parseCSVFile(file);
       } else if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
-        console.log("Parsing Excel file:", file.name);
+        debugLog("Parsing Excel file:", file.name);
         parseResult = await parseExcelFile(file);
       } else {
         throw new Error('Unsupported file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
@@ -574,9 +568,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       
       const { columns, responses, rawData } = parseResult;
       
-      console.log("Total columns found:", columns.length);
-      console.log("Total text responses found:", responses.length);
-      console.log("Raw data rows:", rawData.length);
+      debugLog("Total columns found:", columns.length);
+      debugLog("Total text responses found:", responses.length);
+      debugLog("Raw data rows:", rawData.length);
       
       setFileColumns(columns);
       setRawResponses(responses);

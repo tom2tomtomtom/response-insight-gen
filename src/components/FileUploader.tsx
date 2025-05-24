@@ -18,6 +18,25 @@ const FileUploader: React.FC = () => {
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     return validTypes.includes(fileExtension);
   };
+
+  const processSelectedFile = (file: File, onInvalid?: () => void) => {
+    setFileName(file.name);
+
+    if (validateFileType(file)) {
+      toast({
+        title: 'File Accepted',
+        description: `Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
+      });
+      handleFileUpload(file);
+    } else {
+      onInvalid?.();
+      toast({
+        variant: 'destructive',
+        title: 'Invalid File Format',
+        description: 'Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.',
+      });
+    }
+  };
   
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -35,47 +54,20 @@ const FileUploader: React.FC = () => {
     e.stopPropagation();
     setDragActive(false);
     setDragError(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      setFileName(file.name);
-      
-      if (validateFileType(file)) {
-        toast({
-          title: "File Accepted",
-          description: `Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
-        });
-        handleFileUpload(file);
-      } else {
+      processSelectedFile(file, () => {
         setDragError(true);
-        toast({
-          variant: "destructive",
-          title: "Invalid File Format",
-          description: "Please upload an Excel (.xlsx, .xls) or CSV (.csv) file."
-        });
         setTimeout(() => setDragError(false), 3000);
-      }
+      });
     }
   };
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      setFileName(file.name);
-      
-      if (validateFileType(file)) {
-        toast({
-          title: "File Accepted",
-          description: `Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`,
-        });
-        handleFileUpload(file);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Invalid File Format",
-          description: "Please upload an Excel (.xlsx, .xls) or CSV (.csv) file."
-        });
-      }
+      processSelectedFile(file);
     }
   };
   
