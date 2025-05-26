@@ -10,7 +10,7 @@ import {
   testApiConnection, 
   setUserResponses,
   setApiSelectedColumns,
-  setApiUploadedCodeframe,
+  setUploadedCodeframe,
   setColumnQuestionTypes as setApiColumnQuestionTypes
 } from '../services/api';
 import * as XLSX from 'xlsx';
@@ -590,7 +590,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const saveUploadedCodeframe = (codeframe: UploadedCodeframe) => {
     setUploadedCodeframes(prev => [...prev, codeframe]);
     setActiveCodeframe(codeframe);
-    setApiUploadedCodeframe(codeframe);
+    setUploadedCodeframe(codeframe);
     
     toast({
       title: "Codeframe Saved",
