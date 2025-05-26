@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext } from '../types';
 import { toast } from '../components/ui/use-toast';
@@ -16,7 +17,11 @@ import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
 import { debugLog } from '../utils/debug';
+
 export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellaneous';
+
+interface ProcessingContextType {
+  uploadedFile: UploadedFile | null;
   isUploading: boolean;
   isProcessing: boolean;
   processingStatus: string;
