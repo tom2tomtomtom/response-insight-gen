@@ -6,6 +6,13 @@ export interface UploadedFile {
   status: 'uploaded' | 'processing' | 'complete' | 'failed';
 }
 
+export interface ProjectContext {
+  industry: string;
+  clientName: string;
+  studyObjective: string;
+  studyType: 'tracking' | 'new';
+}
+
 export interface CodeframeEntry {
   code: string;
   numeric: string; // Adding numeric code support
@@ -91,6 +98,7 @@ export interface ColumnInfo {
 export interface ColumnSetting {
   hasNets?: boolean;
   isMultiResponse?: boolean;
+  samplingThreshold?: number; // Add sampling threshold setting
 }
 
 export interface UploadedCodeframe {

@@ -10,7 +10,8 @@ import FilePreview from '../components/FilePreview';
 import ProcessingStatus from '../components/ProcessingStatus';
 import ResultsView from '../components/ResultsView';
 import ApiKeyConfig from '../components/ApiKeyConfig';
-import ColumnSelector from '../components/ColumnSelector';
+import ProjectSetup from '../components/ProjectSetup';
+import CodeframeRefinement from '../components/CodeframeRefinement';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { Link } from "react-router-dom";
@@ -19,7 +20,17 @@ import { FileCode } from "lucide-react";
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {
-  const { uploadedFile, results, processingProgress, apiConfig, fileColumns } = useProcessing();
+  const { 
+    uploadedFile, 
+    results, 
+    processingProgress, 
+    apiConfig, 
+    projectContext, 
+    setProjectContext,
+    isRefinementMode,
+    toggleRefinementMode,
+    refineCodeframe
+  } = useProcessing();
   
   return (
     <div className="space-y-6">
@@ -30,9 +41,17 @@ const IndexContent: React.FC = () => {
         </div>
       )}
       
-      {/* Only show the rest of the content if API is configured or if we're just in demo mode */}
-      <div className={`${!apiConfig?.isConfigured ? 'opacity-50 pointer-events-none' : ''}`}>
-        {!uploadedFile && (
+      {/* Project Setup - show after API is configured but before project context is set */}
+      {apiConfig?.isConfigured && !projectContext && (
+        <ProjectSetup 
+          onComplete={setProjectContext}
+          isConfigured={!!projectContext}
+        />
+      )}
+      
+      {/* Only show the rest of the content if API and project context are configured */}
+      <div className={`${(!apiConfig?.isConfigured || !projectContext) ? 'opacity-50 pointer-events-none' : ''}`}>
+        {!uploadedFile && projectContext && (
           <>
             <IntroCard />
             <div className="flex justify-end mb-4">
@@ -49,13 +68,23 @@ const IndexContent: React.FC = () => {
         <WorkflowSteps />
         
         <div className="space-y-6">
-          {!uploadedFile && <FileUploader />}
+          {!uploadedFile && projectContext && <FileUploader />}
           
           {uploadedFile && !results && processingProgress === 0 && <FilePreview />}
           
           {processingProgress > 0 && <ProcessingStatus />}
           
-          {results && <ResultsView />}
+          {results && (
+            <>
+              <CodeframeRefinement
+                codeframe={results.codeframe}
+                onRefine={refineCodeframe}
+                isRefinementMode={isRefinementMode}
+                onToggleRefinement={toggleRefinementMode}
+              />
+              <ResultsView />
+            </>
+          )}
         </div>
       </div>
     </div>

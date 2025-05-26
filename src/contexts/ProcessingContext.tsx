@@ -9,7 +9,7 @@ import {
   testApiConnection, 
   setUserResponses,
   setApiSelectedColumns,
-  setUploadedCodeframe as setApiUploadedCodeframe,
+  setApiUploadedCodeframe,
   setColumnQuestionTypes as setApiColumnQuestionTypes
 } from '../services/api';
 import * as XLSX from 'xlsx';
@@ -36,6 +36,8 @@ export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellane
   columnSettings: Record<number, ColumnSetting>;
   multipleCodeframes: Record<string, any> | null;
   insights: string | null;
+  projectContext: ProjectContext | null;
+  isRefinementMode: boolean;
   setApiConfig: (config: ApiConfig) => void;
   testApiConnection: (apiKey: string, apiUrl: string) => Promise<boolean>;
   handleFileUpload: (file: File) => Promise<void>;
@@ -73,6 +75,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [columnSettings, setColumnSettings] = useState<Record<number, ColumnSetting>>({});
   const [multipleCodeframes, setMultipleCodeframes] = useState<Record<string, any> | null>(null);
   const [insights, setInsights] = useState<string | null>(null);
+  const [projectContext, setProjectContextState] = useState<ProjectContext | null>(null);
+  const [isRefinementMode, setIsRefinementMode] = useState(false);
 
   // Analyze a sample of values to determine column type and statistics
   const analyzeColumnValues = (values: any[]): { 
@@ -792,6 +796,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setRawFileData(null);
     setMultipleCodeframes(null);
     setInsights(null);
+    setProjectContextState(null);
+    setIsRefinementMode(false);
     // Note: We don't reset the API config and uploaded codeframes on purpose
   };
 
@@ -816,6 +822,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     columnSettings,
     multipleCodeframes,
     insights,
+    projectContext,
+    isRefinementMode,
     setApiConfig,
     testApiConnection: handleTestApiConnection,
     handleFileUpload,
@@ -828,7 +836,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     saveUploadedCodeframe,
     setActiveCodeframe,
     setColumnQuestionType,
-    updateColumnSetting
+    updateColumnSetting,
+    setProjectContext,
+    toggleRefinementMode,
+    refineCodeframe
   };
 
   return (
