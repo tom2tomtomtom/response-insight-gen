@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting } from '../types';
+import { ProcessedResult, UploadedFile, CodedResponse, CodeframeEntry, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { 
   uploadFile, 
@@ -51,6 +51,9 @@ export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellane
   setActiveCodeframe: (codeframe: UploadedCodeframe | null) => void;
   setColumnQuestionType: (columnIndex: number, questionType: string) => void;
   updateColumnSetting: (columnIndex: number, setting: keyof ColumnSetting, value: boolean) => void;
+  setProjectContext: (context: ProjectContext | null) => void;
+  toggleRefinementMode: () => void;
+  refineCodeframe: (codeframe: CodeframeEntry[]) => Promise<void>;
 }
 
 const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
@@ -492,6 +495,45 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         description: error instanceof Error ? error.message : "Could not verify API key",
       });
       return false;
+    }
+  };
+
+  // Set project context
+  const setProjectContext = (context: ProjectContext | null) => {
+    setProjectContextState(context);
+  };
+
+  // Toggle refinement mode
+  const toggleRefinementMode = () => {
+    setIsRefinementMode(prev => !prev);
+  };
+
+  // Refine codeframe
+  const refineCodeframe = async (codeframe: CodeframeEntry[]) => {
+    if (!results) return;
+    
+    try {
+      setIsProcessing(true);
+      setProcessingStatus('Refining codeframe...');
+      
+      // Update the results with the refined codeframe
+      setResults({
+        ...results,
+        codeframe
+      });
+      
+      toast({
+        title: "Codeframe Refined",
+        description: "Your codeframe has been successfully updated.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Refinement Failed",
+        description: error instanceof Error ? error.message : "An error occurred during refinement",
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
