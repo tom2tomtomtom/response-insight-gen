@@ -37,7 +37,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     testApiConnection: handleTestApiConnection,
     startProcessing: handleStartProcessing,
     downloadResults,
-    refineCodeframe
+    refineCodeframe,
+    setProcessingStatus
   } = useProcessingManagement();
 
   const handleFileUpload = async (file: File) => {
