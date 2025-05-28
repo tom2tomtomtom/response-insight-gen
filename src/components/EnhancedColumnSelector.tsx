@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
-import { Search, Play, FileText, FileCode, Tag, CheckSquare, Lightbulb, Upload } from 'lucide-react';
+import { Search, ArrowRight, FileText, FileCode, Tag, CheckSquare, Lightbulb, Upload } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Link } from 'react-router-dom';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
@@ -27,7 +27,11 @@ interface ColumnQuestionConfig {
   codeframeFile?: File;
 }
 
-const EnhancedColumnSelector: React.FC = () => {
+interface EnhancedColumnSelectorProps {
+  onContinueToAnalysis: () => void;
+}
+
+const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onContinueToAnalysis }) => {
   const { 
     fileColumns, 
     selectedColumns, 
@@ -150,13 +154,13 @@ const EnhancedColumnSelector: React.FC = () => {
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Enhanced Column Configuration</span>
+          <span>Column Selection</span>
           <Badge variant="outline" className="ml-2">
             {uploadedFile.filename}
           </Badge>
         </CardTitle>
         <CardDescription>
-          Configure {textColumnCount} text response columns with advanced settings and question types.
+          Select the {textColumnCount} text columns you want to analyze for open-ended responses.
         </CardDescription>
         
         <div className="flex items-center gap-4 mt-4">
@@ -168,15 +172,6 @@ const EnhancedColumnSelector: React.FC = () => {
               value={searchQuery}
               onChange={handleSearchChange}
             />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="multi-select"
-              checked={allowMultiSelection}
-              onCheckedChange={setAllowMultiSelection}
-            />
-            <Label htmlFor="multi-select" className="text-sm">Multi-variable selection</Label>
           </div>
           
           {filteredColumns.length > 0 && (
@@ -204,11 +199,11 @@ const EnhancedColumnSelector: React.FC = () => {
           </div>
         )}
         
-        {/* Insights Tips Alert */}
+        {/* Simplified Instructions */}
         <Alert className="mb-4 bg-blue-50 border-blue-200">
           <Lightbulb className="h-4 w-4 text-blue-500" />
           <AlertDescription className="text-sm">
-            <span className="font-medium">Pro tip:</span> Configure each column with full question text and appropriate settings for better AI analysis.
+            <span className="font-medium">Quick start:</span> Simply select the columns containing open-ended text responses. Advanced settings are available in the next step.
           </AlertDescription>
         </Alert>
         
@@ -229,7 +224,7 @@ const EnhancedColumnSelector: React.FC = () => {
                       onCheckedChange={() => toggleColumnSelection(column.index)}
                       className="mt-1"
                     />
-                    <div className="flex-1 space-y-3">
+                    <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Label
                           htmlFor={`column-${column.index}`}
@@ -248,86 +243,6 @@ const EnhancedColumnSelector: React.FC = () => {
                       <div className="text-xs text-muted-foreground">
                         Example: {column.examples.length > 0 ? column.examples[0] : 'No data'}
                       </div>
-                      
-                      {selectedColumns.includes(column.index) && (
-                        <div className="space-y-3 pt-3 border-t border-gray-200">
-                          {/* Question Type */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Question Type</Label>
-                            <Select
-                              value={columnQuestionTypes[column.index] || "miscellaneous"}
-                              onValueChange={(value) => handleQuestionTypeChange(column.index, value)}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="brand_awareness">Unaided Brand Awareness</SelectItem>
-                                <SelectItem value="brand_description">Brand Description</SelectItem>
-                                <SelectItem value="miscellaneous">Miscellaneous</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          {/* Full Question Text */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Full Question Text</Label>
-                            <Textarea
-                              placeholder="Enter the complete question text for better context..."
-                              value={columnConfigs[column.index]?.fullQuestionText || ''}
-                              onChange={(e) => handleQuestionTextChange(column.index, e.target.value)}
-                              rows={2}
-                            />
-                          </div>
-                          
-                          {/* Existing Codeframe Toggle */}
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-medium">Has Existing Codeframe</Label>
-                            <Switch
-                              checked={columnConfigs[column.index]?.hasExistingCodeframe || false}
-                              onCheckedChange={(checked) => handleExistingCodeframeToggle(column.index, checked)}
-                            />
-                          </div>
-                          
-                          {/* Codeframe File Upload */}
-                          {columnConfigs[column.index]?.hasExistingCodeframe && (
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">Upload Codeframe File</Label>
-                              <Input
-                                type="file"
-                                accept=".xlsx,.csv,.txt"
-                                onChange={(e) => handleCodeframeFileUpload(column.index, e.target.files?.[0] || null)}
-                              />
-                            </div>
-                          )}
-                          
-                          {/* Settings Row */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">Requires Nets</Label>
-                              <Checkbox
-                                checked={columnSettings[column.index]?.hasNets || false}
-                                onCheckedChange={(checked) => handleNetsSettingChange(column.index, !!checked)}
-                              />
-                            </div>
-                            
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">Multi-Response</Label>
-                              <Checkbox
-                                checked={columnSettings[column.index]?.isMultiResponse || false}
-                                onCheckedChange={(checked) => handleMultiResponseChange(column.index, !!checked)}
-                              />
-                            </div>
-                            
-                            {allowMultiSelection && (
-                              <div className="flex items-center justify-between">
-                                <Label className="text-xs">Multi-Variable</Label>
-                                <Checkbox disabled />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -348,16 +263,6 @@ const EnhancedColumnSelector: React.FC = () => {
               <FileText className="h-4 w-4 mr-2" />
               <span>{selectedCount} column{selectedCount !== 1 ? 's' : ''} selected</span>
             </div>
-            
-            {selectedCount > 0 && getSelectedTypes().length > 0 && (
-              <div className="flex gap-1 items-center">
-                {getSelectedTypes().map(typeInfo => (
-                  <Badge key={typeInfo.type} variant="outline" className="text-xs">
-                    {typeInfo.label}: {typeInfo.count}
-                  </Badge>
-                ))}
-              </div>
-            )}
           </div>
           
           {!activeCodeframe && (
@@ -371,12 +276,12 @@ const EnhancedColumnSelector: React.FC = () => {
         </div>
         
         <Button 
-          onClick={startProcessing}
+          onClick={onContinueToAnalysis}
           disabled={selectedCount === 0} 
           className="w-full"
         >
-          <Play className="h-4 w-4 mr-2" />
-          <span>Process Selected Columns with Enhanced Settings</span>
+          <ArrowRight className="h-4 w-4 mr-2" />
+          <span>Continue to Analysis</span>
         </Button>
       </CardFooter>
     </Card>

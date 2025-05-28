@@ -10,8 +10,11 @@ import Layout from '../components/Layout';
 import FileUploader from '../components/FileUploader';
 import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
 import CodeframeApplication from '../components/CodeframeApplication';
+import ResultsView from '../components/ResultsView';
 
 const Index = () => {
+  const [activeTab, setActiveTab] = useState("upload");
+  
   const { 
     uploadedFile,
     isUploading,
@@ -67,6 +70,10 @@ const Index = () => {
     downloadMoniglewCSV
   } = useProcessing();
 
+  const handleContinueToAnalysis = () => {
+    setActiveTab("processing");
+  };
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -80,7 +87,7 @@ const Index = () => {
             </p>
           </div>
 
-          <Tabs defaultValue="upload" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="upload">Upload & Setup</TabsTrigger>
               <TabsTrigger value="processing">Analysis</TabsTrigger>
@@ -93,7 +100,7 @@ const Index = () => {
             <TabsContent value="upload" className="space-y-6">
               <FileUploader />
               {uploadedFile && fileColumns.length > 0 && (
-                <EnhancedColumnSelector />
+                <EnhancedColumnSelector onContinueToAnalysis={handleContinueToAnalysis} />
               )}
             </TabsContent>
 
@@ -124,17 +131,14 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="results" className="space-y-6">
-              <div className="p-6">
-                <h2 className="text-2xl font-bold mb-4">Analysis Results</h2>
-                {results ? (
-                  <div className="space-y-4">
-                    <p>Processing complete! {results.codedResponses.length} responses analyzed.</p>
-                    <Button onClick={downloadResults}>Download Results</Button>
-                  </div>
-                ) : (
+              {results ? (
+                <ResultsView />
+              ) : (
+                <div className="p-6 text-center">
+                  <h2 className="text-2xl font-bold mb-4">Analysis Results</h2>
                   <p>No results available yet. Please run the analysis first.</p>
-                )}
-              </div>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="codeframe-app" className="space-y-6">
