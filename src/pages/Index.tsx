@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { ProcessingProvider } from '../contexts/ProcessingContext';
@@ -125,9 +124,9 @@ const IndexContent: React.FC = () => {
               {/* Multi-Variable Question Matrix */}
               {selectedColumns.length > 0 && (
                 <MultiVariableQuestionMatrix
-                  columns={fileColumns}
                   selectedColumns={selectedColumns}
-                  onConfigUpdate={setColumnQuestionType}
+                  fileColumns={fileColumns}
+                  onColumnConfigUpdate={setColumnQuestionType}
                 />
               )}
               

@@ -366,6 +366,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     saveUploadedCodeframe,
     setActiveCodeframe,
     setColumnQuestionType,
+    setColumnQuestionConfig,
     updateColumnSetting,
     setProjectContext,
     toggleRefinementMode,
