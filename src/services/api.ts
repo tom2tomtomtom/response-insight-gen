@@ -216,6 +216,34 @@ const ensureOtherCategory = (codeframe: any[]) => {
   }];
 };
 
+// Helper function to create unique worksheet names
+const createUniqueWorksheetName = (baseName: string, existingNames: Set<string>): string => {
+  // Excel worksheet names have a 31 character limit and cannot contain certain characters
+  let cleanName = baseName.replace(/[*?[\]]/g, '_').substring(0, 31);
+  
+  if (!existingNames.has(cleanName)) {
+    existingNames.add(cleanName);
+    return cleanName;
+  }
+  
+  // If name exists, add a number suffix
+  for (let i = 1; i <= 99; i++) {
+    const suffix = `_${i}`;
+    const maxBaseLength = 31 - suffix.length;
+    const uniqueName = cleanName.substring(0, maxBaseLength) + suffix;
+    
+    if (!existingNames.has(uniqueName)) {
+      existingNames.add(uniqueName);
+      return uniqueName;
+    }
+  }
+  
+  // Fallback - should rarely happen
+  const fallbackName = `Sheet_${Date.now().toString().slice(-6)}`;
+  existingNames.add(fallbackName);
+  return fallbackName;
+};
+
 // Generate codeframe for a specific question type
 const generatePromptByQuestionType = (questionType: string, columns: any[], uploadedCodeframe: UploadedCodeframe | null) => {
   let promptContent = "";
@@ -602,8 +630,13 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
 // Function to generate an Excel file from the results with multiple codeframes
 export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> => {
   try {
+    console.log("Starting Excel file generation...");
+    
     // Create a new workbook
     const workbook = XLSX.utils.book_new();
+    
+    // Track worksheet names to prevent duplicates
+    const worksheetNames = new Set<string>();
     
     // Check for multiple codeframes
     const hasMultipleCodeframes = result.multipleCodeframes && 
@@ -611,41 +644,134 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
     
     // Add overall summary tab if we have insights
     if (result.insights) {
-      // Convert the insights markdown to a format suitable for Excel
-      const insightRows = result.insights.split('\n').map(line => [line]);
-      const insightsWorksheet = XLSX.utils.aoa_to_sheet(insightRows);
-      XLSX.utils.book_append_sheet(workbook, insightsWorksheet, "Analysis Insights");
+      console.log("Adding insights worksheet...");
+      try {
+        // Convert the insights markdown to a format suitable for Excel
+        const insightRows = result.insights.split('\n').map(line => [line]);
+        const insightsWorksheet = XLSX.utils.aoa_to_sheet(insightRows);
+        const insightsSheetName = createUniqueWorksheetName("Analysis Insights", worksheetNames);
+        XLSX.utils.book_append_sheet(workbook, insightsWorksheet, insightsSheetName);
+      } catch (error) {
+        console.error("Error adding insights worksheet:", error);
+      }
     }
     
     // If we have multiple codeframes, create a worksheet for each question type
     if (hasMultipleCodeframes) {
+      console.log("Processing multiple codeframes...");
+      
       Object.entries(result.multipleCodeframes).forEach(([questionType, typeData]) => {
-        // Create readable question type name
-        const questionTypeName = questionType === 'brand_awareness' ? 'Brand Awareness' : 
-                                questionType === 'brand_description' ? 'Brand Description' : 
-                                'Miscellaneous';
-                                
-        // Create codeframe worksheet for this question type
-        if (typeData.codeframe) {
-          const codeframeData = typeData.codeframe.map((code: any) => ({
-            Code: code.code,
-            Numeric: code.numeric || '',
-            Label: code.label,
-            Definition: code.definition,
-            Examples: (code.examples || []).join('; '),
-            Count: code.count || 0,
-            Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%',
-            ...(code.parentCode ? { ParentCode: code.parentCode } : {}),
-            ...(code.themeGroup ? { Theme: code.themeGroup } : {})
-          }));
+        try {
+          // Create readable question type name
+          const questionTypeName = questionType === 'brand_awareness' ? 'Brand Awareness' : 
+                                  questionType === 'brand_description' ? 'Brand Description' : 
+                                  'Miscellaneous';
+                                  
+          // Create codeframe worksheet for this question type
+          if (typeData.codeframe) {
+            const codeframeData = typeData.codeframe.map((code: any) => ({
+              Code: code.code,
+              Numeric: code.numeric || '',
+              Label: code.label,
+              Definition: code.definition,
+              Examples: (code.examples || []).join('; '),
+              Count: code.count || 0,
+              Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%',
+              ...(code.parentCode ? { ParentCode: code.parentCode } : {}),
+              ...(code.themeGroup ? { Theme: code.themeGroup } : {})
+            }));
+            
+            const typeCodeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
+            const codeframeSheetName = createUniqueWorksheetName(`${questionTypeName} Codes`, worksheetNames);
+            XLSX.utils.book_append_sheet(workbook, typeCodeframeWorksheet, codeframeSheetName);
+          }
           
-          const typeCodeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
-          XLSX.utils.book_append_sheet(workbook, typeCodeframeWorksheet, `${questionTypeName} Codes`);
+          // Create code summary worksheet for this question type
+          if (typeData.codeSummary) {
+            const summaryData = typeData.codeSummary.map((code: any) => ({
+              Code: code.code,
+              Numeric: code.numeric || '',
+              Label: code.label,
+              Count: code.count,
+              Percentage: `${code.percentage.toFixed(1)}%`
+            }));
+            
+            const typeSummaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+            const summarySheetName = createUniqueWorksheetName(`${questionTypeName} Summary`, worksheetNames);
+            XLSX.utils.book_append_sheet(workbook, typeSummaryWorksheet, summarySheetName);
+          }
+          
+          // Add brand hierarchies if available
+          if (questionType === 'brand_awareness' && typeData.brandHierarchies) {
+            const hierarchyData: any[] = [];
+            
+            Object.entries(typeData.brandHierarchies).forEach(([parent, children]) => {
+              hierarchyData.push({ ParentSystem: parent, ChildBrand: '', Count: '' });
+              (children as string[]).forEach(child => {
+                const childCode = typeData.codeframe.find((c: any) => c.code === child);
+                hierarchyData.push({ 
+                  ParentSystem: '',
+                  ChildBrand: childCode?.label || child,
+                  Count: childCode?.count || 0
+                });
+              });
+            });
+            
+            if (hierarchyData.length > 0) {
+              const hierarchyWorksheet = XLSX.utils.json_to_sheet(hierarchyData);
+              const hierarchySheetName = createUniqueWorksheetName("Brand Hierarchies", worksheetNames);
+              XLSX.utils.book_append_sheet(workbook, hierarchyWorksheet, hierarchySheetName);
+            }
+          }
+          
+          // Add attribute themes if available
+          if (questionType === 'brand_description' && typeData.attributeThemes) {
+            const themeData: any[] = [];
+            
+            Object.entries(typeData.attributeThemes).forEach(([theme, attributes]) => {
+              themeData.push({ Theme: theme, Attribute: '', Count: '' });
+              (attributes as string[]).forEach(attr => {
+                const attrCode = typeData.codeframe.find((c: any) => c.code === attr);
+                themeData.push({ 
+                  Theme: '',
+                  Attribute: attrCode?.label || attr,
+                  Count: attrCode?.count || 0
+                });
+              });
+            });
+            
+            if (themeData.length > 0) {
+              const themeWorksheet = XLSX.utils.json_to_sheet(themeData);
+              const themeSheetName = createUniqueWorksheetName("Attribute Themes", worksheetNames);
+              XLSX.utils.book_append_sheet(workbook, themeWorksheet, themeSheetName);
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing question type ${questionType}:`, error);
+          // Continue with other question types
         }
+      });
+    } else {
+      console.log("Processing single codeframe...");
+      try {
+        // If no multiple codeframes, keep the original codeframe worksheet
+        const codeframeData = result.codeframe.map(code => ({
+          Code: code.code,
+          Numeric: code.numeric || '',
+          Label: code.label,
+          Definition: code.definition,
+          Examples: (code.examples || []).join('; '),
+          Count: code.count || 0,
+          Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%'
+        }));
         
-        // Create code summary worksheet for this question type
-        if (typeData.codeSummary) {
-          const summaryData = typeData.codeSummary.map((code: any) => ({
+        const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
+        const codeframeSheetName = createUniqueWorksheetName("Codeframe", worksheetNames);
+        XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, codeframeSheetName);
+        
+        // Add the Code Summary worksheet if available
+        if (result.codeSummary) {
+          const summaryData = result.codeSummary.map(code => ({
             Code: code.code,
             Numeric: code.numeric || '',
             Label: code.label,
@@ -653,129 +779,31 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
             Percentage: `${code.percentage.toFixed(1)}%`
           }));
           
-          const typeSummaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
-          XLSX.utils.book_append_sheet(workbook, typeSummaryWorksheet, `${questionTypeName} Summary`);
+          const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
+          const summarySheetName = createUniqueWorksheetName("Code Summary", worksheetNames);
+          XLSX.utils.book_append_sheet(workbook, summaryWorksheet, summarySheetName);
         }
-        
-        // Add brand hierarchies if available
-        if (questionType === 'brand_awareness' && typeData.brandHierarchies) {
-          const hierarchyData: any[] = [];
-          
-          Object.entries(typeData.brandHierarchies).forEach(([parent, children]) => {
-            hierarchyData.push({ ParentSystem: parent, ChildBrand: '', Count: '' });
-            (children as string[]).forEach(child => {
-              const childCode = typeData.codeframe.find((c: any) => c.code === child);
-              hierarchyData.push({ 
-                ParentSystem: '',
-                ChildBrand: childCode?.label || child,
-                Count: childCode?.count || 0
-              });
-            });
-          });
-          
-          if (hierarchyData.length > 0) {
-            const hierarchyWorksheet = XLSX.utils.json_to_sheet(hierarchyData);
-            XLSX.utils.book_append_sheet(workbook, hierarchyWorksheet, "Brand Hierarchies");
-          }
-        }
-        
-        // Add attribute themes if available
-        if (questionType === 'brand_description' && typeData.attributeThemes) {
-          const themeData: any[] = [];
-          
-          Object.entries(typeData.attributeThemes).forEach(([theme, attributes]) => {
-            themeData.push({ Theme: theme, Attribute: '', Count: '' });
-            (attributes as string[]).forEach(attr => {
-              const attrCode = typeData.codeframe.find((c: any) => c.code === attr);
-              themeData.push({ 
-                Theme: '',
-                Attribute: attrCode?.label || attr,
-                Count: attrCode?.count || 0
-              });
-            });
-          });
-          
-          if (themeData.length > 0) {
-            const themeWorksheet = XLSX.utils.json_to_sheet(themeData);
-            XLSX.utils.book_append_sheet(workbook, themeWorksheet, "Attribute Themes");
-          }
-        }
-      });
-    } else {
-      // If no multiple codeframes, keep the original codeframe worksheet
-      const codeframeData = result.codeframe.map(code => ({
-        Code: code.code,
-        Numeric: code.numeric || '',
-        Label: code.label,
-        Definition: code.definition,
-        Examples: (code.examples || []).join('; '),
-        Count: code.count || 0,
-        Percentage: code.percentage ? `${code.percentage.toFixed(1)}%` : '0%'
-      }));
-      
-      const codeframeWorksheet = XLSX.utils.json_to_sheet(codeframeData);
-      XLSX.utils.book_append_sheet(workbook, codeframeWorksheet, "Codeframe");
-      
-      // Add the Code Summary worksheet if available
-      if (result.codeSummary) {
-        const summaryData = result.codeSummary.map(code => ({
-          Code: code.code,
-          Numeric: code.numeric || '',
-          Label: code.label,
-          Count: code.count,
-          Percentage: `${code.percentage.toFixed(1)}%`
-        }));
-        
-        const summaryWorksheet = XLSX.utils.json_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(workbook, summaryWorksheet, "Code Summary");
+      } catch (error) {
+        console.error("Error processing single codeframe:", error);
       }
     }
     
     // Create the Coded Responses worksheet (this always contains all responses)
-    const responsesData = result.codedResponses.map(response => ({
-      Response: response.responseText,
-      Column: response.columnName || 'Unknown',
-      QuestionType: hasMultipleCodeframes ? 
-        userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' : 
-        'N/A',
-      Codes: response.codesAssigned.join('; '),
-      NumericCodes: response.codesAssigned.map(code => {
-        // Find the code in the appropriate codeframe based on question type
-        const questionType = hasMultipleCodeframes ? 
-          userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' :
-          '';
-          
-        let codeEntry;
-        if (hasMultipleCodeframes && questionType && result.multipleCodeframes[questionType]) {
-          codeEntry = result.multipleCodeframes[questionType].codeframe.find((c: any) => c.code === code);
-        } else {
-          codeEntry = result.codeframe.find(c => c.code === code);
-        }
-        
-        return codeEntry ? codeEntry.numeric || code : code;
-      }).join('; ')
-    }));
-    
-    const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
-    XLSX.utils.book_append_sheet(workbook, responsesWorksheet, "Coded Responses");
-    
-    // Create column-specific worksheets
-    const columnResponses = new Map<string, any[]>();
-    
-    // Group responses by column
-    result.codedResponses.forEach(response => {
-      if (response.columnName) {
-        const key = response.columnName;
-        if (!columnResponses.has(key)) {
-          columnResponses.set(key, []);
-        }
-        
-        // Determine which codeframe to use for this response
-        const questionType = hasMultipleCodeframes ? 
-          userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' :
-          '';
-          
-        const codes = response.codesAssigned.map(code => {
+    console.log("Adding coded responses worksheet...");
+    try {
+      const responsesData = result.codedResponses.map(response => ({
+        Response: response.responseText,
+        Column: response.columnName || 'Unknown',
+        QuestionType: hasMultipleCodeframes ? 
+          userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' : 
+          'N/A',
+        Codes: response.codesAssigned.join('; '),
+        NumericCodes: response.codesAssigned.map(code => {
+          // Find the code in the appropriate codeframe based on question type
+          const questionType = hasMultipleCodeframes ? 
+            userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' :
+            '';
+            
           let codeEntry;
           if (hasMultipleCodeframes && questionType && result.multipleCodeframes[questionType]) {
             codeEntry = result.multipleCodeframes[questionType].codeframe.find((c: any) => c.code === code);
@@ -783,38 +811,84 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
             codeEntry = result.codeframe.find(c => c.code === code);
           }
           
-          return codeEntry ? `${codeEntry.numeric || ''} - ${codeEntry.label}` : code;
-        }).join('; ');
-        
-        columnResponses.get(key)?.push({
-          Response: response.responseText,
-          QuestionType: hasMultipleCodeframes ? 
-            (questionType === 'brand_awareness' ? 'Brand Awareness' : 
-             questionType === 'brand_description' ? 'Brand Description' : 
-             'Miscellaneous') : 
-            'N/A',
-          Codes: codes
-        });
-      }
-    });
+          return codeEntry ? codeEntry.numeric || code : code;
+        }).join('; ')
+      }));
+      
+      const responsesWorksheet = XLSX.utils.json_to_sheet(responsesData);
+      const responsesSheetName = createUniqueWorksheetName("Coded Responses", worksheetNames);
+      XLSX.utils.book_append_sheet(workbook, responsesWorksheet, responsesSheetName);
+    } catch (error) {
+      console.error("Error adding coded responses worksheet:", error);
+    }
     
-    // Create a worksheet for each column
-    columnResponses.forEach((responses, columnName) => {
-      const safeSheetName = columnName.substring(0, 30).replace(/[*?[\]]/g, '_');
-      const worksheet = XLSX.utils.json_to_sheet(responses);
-      XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
-    });
+    // Create column-specific worksheets
+    console.log("Adding column-specific worksheets...");
+    try {
+      const columnResponses = new Map<string, any[]>();
+      
+      // Group responses by column
+      result.codedResponses.forEach(response => {
+        if (response.columnName) {
+          const key = response.columnName;
+          if (!columnResponses.has(key)) {
+            columnResponses.set(key, []);
+          }
+          
+          // Determine which codeframe to use for this response
+          const questionType = hasMultipleCodeframes ? 
+            userColumnQuestionTypes[response.columnIndex] || 'miscellaneous' :
+            '';
+            
+          const codes = response.codesAssigned.map(code => {
+            let codeEntry;
+            if (hasMultipleCodeframes && questionType && result.multipleCodeframes[questionType]) {
+              codeEntry = result.multipleCodeframes[questionType].codeframe.find((c: any) => c.code === code);
+            } else {
+              codeEntry = result.codeframe.find(c => c.code === code);
+            }
+            
+            return codeEntry ? `${codeEntry.numeric || ''} - ${codeEntry.label}` : code;
+          }).join('; ');
+          
+          columnResponses.get(key)?.push({
+            Response: response.responseText,
+            QuestionType: hasMultipleCodeframes ? 
+              (questionType === 'brand_awareness' ? 'Brand Awareness' : 
+               questionType === 'brand_description' ? 'Brand Description' : 
+               'Miscellaneous') : 
+              'N/A',
+            Codes: codes
+          });
+        }
+      });
+      
+      // Create a worksheet for each column
+      columnResponses.forEach((responses, columnName) => {
+        try {
+          const worksheet = XLSX.utils.json_to_sheet(responses);
+          const columnSheetName = createUniqueWorksheetName(columnName, worksheetNames);
+          XLSX.utils.book_append_sheet(workbook, worksheet, columnSheetName);
+        } catch (error) {
+          console.error(`Error creating worksheet for column ${columnName}:`, error);
+        }
+      });
+    } catch (error) {
+      console.error("Error adding column-specific worksheets:", error);
+    }
     
     // Write the workbook to an array buffer
+    console.log("Writing workbook to buffer...");
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     
     // Create a Blob from the ArrayBuffer
+    console.log("Excel file generation completed successfully");
     return new Blob([excelBuffer], { 
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     });
   } catch (error) {
     console.error("Error generating Excel file:", error);
-    throw new Error('Failed to generate Excel file');
+    throw new Error(`Failed to generate Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
