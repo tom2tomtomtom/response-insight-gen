@@ -152,11 +152,14 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       [columnIndex]: config
     }));
     
-    // Also update the question type
+    // Also update the question type for backward compatibility
     setColumnQuestionTypes(prev => ({
       ...prev,
       [columnIndex]: config.questionType as QuestionType
     }));
+    
+    // Mark as having unsaved changes
+    setHasUnsavedChanges(true);
   };
 
   const updateColumnSetting = (columnIndex: number, setting: keyof ColumnSetting, value: boolean) => {
