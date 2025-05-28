@@ -21,7 +21,7 @@ const Index: React.FC = () => {
     startProcessing, 
     isProcessing,
     results,
-    resetWorkflow
+    resetState
   } = useProcessing();
   
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ const Index: React.FC = () => {
   };
 
   const handleReset = () => {
-    resetWorkflow();
+    resetState();
     setActiveTab('setup');
   };
 
