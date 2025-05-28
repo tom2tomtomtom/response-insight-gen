@@ -1,17 +1,22 @@
-
 import React, { useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Loader2, Upload, AlertCircle, FileQuestion, Info } from 'lucide-react';
 import { toast } from './ui/use-toast';
+import UploadSuccessCard from './UploadSuccessCard';
 
 const FileUploader: React.FC = () => {
-  const { handleFileUpload, isUploading } = useProcessing();
+  const { handleFileUpload, isUploading, uploadedFile, fileColumns } = useProcessing();
   const [dragActive, setDragActive] = useState(false);
   const [dragError, setDragError] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Show success card if file is uploaded and columns are available
+  if (uploadedFile && fileColumns && fileColumns.length > 0) {
+    return <UploadSuccessCard />;
+  }
   
   const validateFileType = (file: File): boolean => {
     const validTypes = ['.xlsx', '.xls', '.csv'];

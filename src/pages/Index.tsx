@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useProcessing } from '../contexts/ProcessingContext';
 import Layout from '../components/Layout';
 import FileUploader from '../components/FileUploader';
+import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
 import CodeframeApplication from '../components/CodeframeApplication';
 
 const Index = () => {
@@ -91,6 +92,9 @@ const Index = () => {
 
             <TabsContent value="upload" className="space-y-6">
               <FileUploader />
+              {uploadedFile && fileColumns.length > 0 && (
+                <EnhancedColumnSelector />
+              )}
             </TabsContent>
 
             <TabsContent value="processing" className="space-y-6">
@@ -102,10 +106,18 @@ const Index = () => {
                   </div>
                 ) : (
                   <div className="text-center">
-                    <p>Ready to start processing?</p>
-                    <Button onClick={startProcessing} disabled={isProcessing || !uploadedFile}>
-                      Start Processing
-                    </Button>
+                    {!uploadedFile ? (
+                      <p>Please upload a file first in the Upload & Setup tab.</p>
+                    ) : selectedColumns.length === 0 ? (
+                      <p>Please select columns to analyze in the Upload & Setup tab.</p>
+                    ) : (
+                      <>
+                        <p>Ready to start processing {selectedColumns.length} selected column{selectedColumns.length !== 1 ? 's' : ''}?</p>
+                        <Button onClick={startProcessing} disabled={isProcessing || !uploadedFile}>
+                          Start Processing
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
