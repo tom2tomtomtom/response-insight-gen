@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import FileUploader from '../components/FileUploader';
 import ColumnSelector from '../components/ColumnSelector';
-import ProcessingStatus from '../components/ProcessingStatus';
+import EnhancedProcessingStatus from '../components/EnhancedProcessingStatus';
 import ResultsView from '../components/ResultsView';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Settings, Upload, BarChart3, FileText, Key } from 'lucide-react';
@@ -119,7 +119,7 @@ const Index: React.FC = () => {
 
           <TabsContent value="analysis" className="space-y-6">
             <div className="w-full max-w-4xl mx-auto">
-              <ProcessingStatus />
+              <EnhancedProcessingStatus />
             </div>
           </TabsContent>
 
