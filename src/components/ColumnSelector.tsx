@@ -5,7 +5,7 @@ import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Search, Play, FileText, FileCode, Tag, CheckSquare, Lightbulb } from 'lucide-react';
+import { Search, ArrowRight, FileText, FileCode, Tag, CheckSquare, Lightbulb } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Link } from 'react-router-dom';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select';
@@ -18,13 +18,16 @@ const QUESTION_TYPES = {
   "miscellaneous": "Miscellaneous"
 };
 
-const ColumnSelector: React.FC = () => {
+interface ColumnSelectorProps {
+  onContinueToAnalysis: () => void;
+}
+
+const ColumnSelector: React.FC<ColumnSelectorProps> = ({ onContinueToAnalysis }) => {
   const { 
     fileColumns, 
     selectedColumns, 
     toggleColumnSelection,
     selectMultipleColumns,
-    startProcessing, 
     uploadedFile, 
     searchQuery,
     setSearchQuery,
@@ -299,12 +302,12 @@ const ColumnSelector: React.FC = () => {
         )}
         
         <Button 
-          onClick={startProcessing}
+          onClick={onContinueToAnalysis}
           disabled={selectedCount === 0} 
           className="space-x-2 w-full md:w-auto"
         >
-          <Play className="h-4 w-4" />
-          <span>Process Selected Columns</span>
+          <ArrowRight className="h-4 w-4" />
+          <span>Continue to Analysis</span>
         </Button>
       </CardFooter>
     </Card>

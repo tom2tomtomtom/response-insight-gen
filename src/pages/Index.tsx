@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useProcessing } from '../contexts/ProcessingContext';
 import Layout from '../components/Layout';
 import FileUploader from '../components/FileUploader';
-import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
+import ColumnSelector from '../components/ColumnSelector';
 import CodeframeApplication from '../components/CodeframeApplication';
 import ResultsView from '../components/ResultsView';
 
@@ -100,7 +100,7 @@ const Index = () => {
             <TabsContent value="upload" className="space-y-6">
               <FileUploader />
               {uploadedFile && fileColumns.length > 0 && (
-                <EnhancedColumnSelector onContinueToAnalysis={handleContinueToAnalysis} />
+                <ColumnSelector onContinueToAnalysis={handleContinueToAnalysis} />
               )}
             </TabsContent>
 
