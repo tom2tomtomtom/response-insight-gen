@@ -20,15 +20,21 @@ const Layout: React.FC<LayoutProps> = ({
   const location = useLocation();
   
   const handleConfigClick = () => {
+    console.log('Configure API button clicked');
     if (location.pathname === '/') {
       // If we're on the homepage, scroll to the API config section
-      const apiConfigElement = document.querySelector('#api-config-section');
-      if (apiConfigElement) {
-        apiConfigElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
-        });
-      }
+      setTimeout(() => {
+        const apiConfigElement = document.querySelector('#api-config-section');
+        console.log('API config element found:', apiConfigElement);
+        if (apiConfigElement) {
+          apiConfigElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        } else {
+          console.log('API config element not found');
+        }
+      }, 100);
     } else {
       // Otherwise navigate to homepage
       navigate('/');
@@ -62,7 +68,12 @@ const Layout: React.FC<LayoutProps> = ({
               Upload Codeframe
             </Button>
             
-            <Button variant={apiConfig?.isConfigured ? "outline" : "default"} size="sm" className={`flex items-center gap-1 ${apiConfig?.isConfigured ? 'border-green-500 text-green-600' : ''}`} onClick={handleConfigClick}>
+            <Button 
+              variant={apiConfig?.isConfigured ? "outline" : "default"} 
+              size="sm" 
+              className={`flex items-center gap-1 ${apiConfig?.isConfigured ? 'border-green-500 text-green-600' : ''}`} 
+              onClick={handleConfigClick}
+            >
               <Settings2 className="h-4 w-4" />
               {apiConfig?.isConfigured ? "API Configured" : "Configure API"}
             </Button>
