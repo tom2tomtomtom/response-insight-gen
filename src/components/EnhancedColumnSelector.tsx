@@ -119,12 +119,6 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
             )}
           </div>
         </CardContent>
-        
-        <ColumnSelectionSummary
-          selectedCount={selectedCount}
-          activeCodeframe={activeCodeframe}
-          onContinueToAnalysis={onContinueToAnalysis}
-        />
       </Card>
 
       {/* Enhanced Configuration Section - Make it more prominent and always show when there are selected columns */}
@@ -160,6 +154,17 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
             </CardHeader>
           </Card>
         </div>
+      )}
+
+      {/* Analysis Button - Always visible at the bottom when columns are selected */}
+      {selectedColumns.length > 0 && (
+        <Card className="w-full">
+          <ColumnSelectionSummary
+            selectedCount={selectedCount}
+            activeCodeframe={activeCodeframe}
+            onContinueToAnalysis={onContinueToAnalysis}
+          />
+        </Card>
       )}
     </div>
   );
