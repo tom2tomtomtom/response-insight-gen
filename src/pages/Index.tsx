@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import FileUploader from '../components/FileUploader';
-import ColumnSelector from '../components/ColumnSelector';
+import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
 import EnhancedProcessingStatus from '../components/EnhancedProcessingStatus';
 import ResultsView from '../components/ResultsView';
+import StudySummaryPanel from '../components/StudySummaryPanel';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Settings, Upload, BarChart3, FileText, Key } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +22,8 @@ const Index: React.FC = () => {
     startProcessing, 
     isProcessing,
     results,
-    resetState
+    resetState,
+    projectContext
   } = useProcessing();
   
   const navigate = useNavigate();
@@ -112,7 +114,10 @@ const Index: React.FC = () => {
               )}
               
               {hasUploadedFile && (
-                <ColumnSelector onContinueToAnalysis={handleContinueToAnalysis} />
+                <>
+                  <StudySummaryPanel />
+                  <EnhancedColumnSelector onContinueToAnalysis={handleContinueToAnalysis} />
+                </>
               )}
             </div>
           </TabsContent>
@@ -178,6 +183,18 @@ const Index: React.FC = () => {
                           {fileColumns ? `${fileColumns.length} columns` : 'None'}
                         </p>
                       </div>
+                      {projectContext && (
+                        <>
+                          <div>
+                            <p className="font-medium">Study Type</p>
+                            <p className="text-muted-foreground">{projectContext.studyType}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium">Industry</p>
+                            <p className="text-muted-foreground">{projectContext.industry}</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>

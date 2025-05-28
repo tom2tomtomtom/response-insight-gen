@@ -1,166 +1,157 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Switch } from './ui/switch';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
-import { Upload, Calendar, TrendingUp } from 'lucide-react';
-import { TrackingStudyConfig, CodeframeEntry } from '../types';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Alert, AlertDescription } from './ui/alert';
+import { Upload, TrendingUp, FileText } from 'lucide-react';
+import { useProcessing } from '../contexts/ProcessingContext';
+import { CodeframeEntry, TrackingStudyConfig } from '../types';
 
 interface TrackingStudyManagerProps {
-  config: TrackingStudyConfig;
-  onConfigChange: (config: TrackingStudyConfig) => void;
+  onConfigurationChange: (config: TrackingStudyConfig) => void;
 }
 
 const TrackingStudyManager: React.FC<TrackingStudyManagerProps> = ({
-  config,
-  onConfigChange
+  onConfigurationChange
 }) => {
-  const [uploadedCodeframe, setUploadedCodeframe] = useState<CodeframeEntry[]>([]);
+  const { trackingConfig, setTrackingConfig } = useProcessing();
+  const [uploadedCodeframe, setUploadedCodeframe] = useState<CodeframeEntry[] | null>(null);
+  const [codeframeFile, setCodeframeFile] = useState<File | null>(null);
 
-  const handleCodeframeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Mock parsing - in real implementation, would parse Excel/CSV
-    const mockCodeframe: CodeframeEntry[] = [
-      {
-        code: "1",
-        numeric: "1",
-        label: "Quality",
-        definition: "Mentions of product quality",
-        examples: ["High quality", "Good quality"],
-        count: 45,
-        percentage: 15.2
-      },
-      {
-        code: "2", 
-        numeric: "2",
-        label: "Price",
-        definition: "Price-related mentions",
-        examples: ["Affordable", "Expensive"],
-        count: 32,
-        percentage: 10.8
-      }
-    ];
-
-    setUploadedCodeframe(mockCodeframe);
-    onConfigChange({
-      ...config,
-      isPriorCodeframe: true,
-      priorCodeframe: mockCodeframe
-    });
+  const handleTrackingToggle = (isPrior: boolean) => {
+    const newConfig = {
+      ...trackingConfig,
+      isPriorCodeframe: isPrior,
+      priorCodeframe: isPrior ? uploadedCodeframe || undefined : undefined
+    };
+    setTrackingConfig(newConfig);
+    onConfigurationChange(newConfig);
   };
 
-  const updateWaveNumber = (waveNumber: number) => {
-    onConfigChange({
-      ...config,
+  const handleWaveNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const waveNumber = parseInt(e.target.value) || 1;
+    const newConfig = {
+      ...trackingConfig,
       waveNumber
-    });
+    };
+    setTrackingConfig(newConfig);
+    onConfigurationChange(newConfig);
+  };
+
+  const handleCodeframeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCodeframeFile(file);
+    
+    // In a real implementation, you would parse the file here
+    // For now, we'll simulate a parsed codeframe
+    const simulatedCodeframe: CodeframeEntry[] = [
+      {
+        code: "BRAND_A",
+        numeric: "1",
+        label: "Brand A",
+        definition: "References to Brand A",
+        examples: ["Brand A", "A brand"]
+      },
+      {
+        code: "BRAND_B", 
+        numeric: "2",
+        label: "Brand B",
+        definition: "References to Brand B",
+        examples: ["Brand B", "B brand"]
+      }
+    ];
+    
+    setUploadedCodeframe(simulatedCodeframe);
+    
+    const newConfig = {
+      ...trackingConfig,
+      priorCodeframe: simulatedCodeframe
+    };
+    setTrackingConfig(newConfig);
+    onConfigurationChange(newConfig);
   };
 
   return (
-    <Card className="w-full">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
           Tracking Study Configuration
-          <Badge variant="secondary">Wave {config.waveNumber || 1}</Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Wave Number</Label>
-            <Input
-              type="number"
-              min="1"
-              value={config.waveNumber || 1}
-              onChange={(e) => updateWaveNumber(parseInt(e.target.value))}
-            />
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Label>Use Prior Wave Codeframe</Label>
+            <p className="text-sm text-muted-foreground">
+              Reuse existing codes from previous wave
+            </p>
           </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Use Prior Wave Codeframe</Label>
-              <p className="text-xs text-muted-foreground">
-                Reuse codeframe from previous wave
-              </p>
-            </div>
-            <Switch
-              checked={config.isPriorCodeframe}
-              onCheckedChange={(checked) => onConfigChange({
-                ...config,
-                isPriorCodeframe: checked
-              })}
-            />
-          </div>
+          <Switch
+            checked={trackingConfig.isPriorCodeframe}
+            onCheckedChange={handleTrackingToggle}
+          />
         </div>
 
-        {config.isPriorCodeframe && (
-          <div className="space-y-4">
+        {trackingConfig.isPriorCodeframe && (
+          <>
             <div className="space-y-2">
-              <Label>Upload Prior Wave Codeframe</Label>
+              <Label>Wave Number</Label>
               <Input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleCodeframeUpload}
+                type="number"
+                value={trackingConfig.waveNumber}
+                onChange={handleWaveNumberChange}
+                className="w-32"
+                min="1"
+                placeholder="1"
               />
-              <p className="text-xs text-muted-foreground">
-                Upload the codeframe from the previous wave to maintain consistency
-              </p>
             </div>
 
-            {uploadedCodeframe.length > 0 && (
-              <div className="space-y-2">
-                <Label>Prior Wave Codeframe Preview</Label>
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Label</TableHead>
-                        <TableHead>Definition</TableHead>
-                        <TableHead>Examples</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {uploadedCodeframe.slice(0, 5).map((entry, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{entry.code}</TableCell>
-                          <TableCell>{entry.label}</TableCell>
-                          <TableCell className="max-w-[200px] truncate">{entry.definition}</TableCell>
-                          <TableCell>
-                            {entry.examples.slice(0, 2).join(', ')}
-                            {entry.examples.length > 2 && '...'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {uploadedCodeframe.length > 5 && (
-                    <div className="p-2 text-center text-sm text-muted-foreground">
-                      +{uploadedCodeframe.length - 5} more codes
-                    </div>
-                  )}
-                </div>
+            <div className="space-y-2">
+              <Label>Upload Prior Codeframe</Label>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleCodeframeUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <Button variant="outline" className="w-full">
+                  <Upload className="h-4 w-4 mr-2" />
+                  {codeframeFile ? codeframeFile.name : 'Choose Codeframe File'}
+                </Button>
               </div>
-            )}
-          </div>
-        )}
+            </div>
 
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">Tracking Study Features</h4>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• New codes will be marked as "*New – Wave {config.waveNumber || 1}*"</li>
-            <li>• Code order and definitions maintained from prior wave</li>
-            <li>• Automatic comparison with previous wave results</li>
-            <li>• Trend analysis and changes highlighting</li>
-          </ul>
-        </div>
+            {uploadedCodeframe && (
+              <Alert className="bg-green-50 border-green-200">
+                <FileText className="h-4 w-4 text-green-500" />
+                <AlertDescription className="text-green-700">
+                  <div className="flex items-center justify-between">
+                    <span>Prior codeframe loaded successfully</span>
+                    <Badge variant="outline" className="text-green-600">
+                      {uploadedCodeframe.length} codes
+                    </Badge>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>Tracking Study Logic:</strong> New codes will be marked as 
+                <Badge variant="secondary" className="mx-1">*New – Wave {trackingConfig.waveNumber}*</Badge> 
+                and added to the end of the codeframe while maintaining existing order and definitions.
+              </p>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
