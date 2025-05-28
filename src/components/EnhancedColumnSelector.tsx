@@ -1,13 +1,19 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import ColumnSearchControls from './ColumnSearchControls';
 import ColumnCard from './ColumnCard';
 import ColumnSelectionSummary from './ColumnSelectionSummary';
 import QuickStartAlert from './QuickStartAlert';
 import ActiveCodeframeDisplay from './ActiveCodeframeDisplay';
+import MultiVariableQuestionMatrix from './MultiVariableQuestionMatrix';
+import SampleThresholdControl from './SampleThresholdControl';
+import BrandListManager from './BrandListManager';
 
 interface EnhancedColumnSelectorProps {
   onContinueToAnalysis: () => void;
@@ -22,8 +28,13 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
     uploadedFile, 
     searchQuery,
     setSearchQuery,
-    activeCodeframe
+    activeCodeframe,
+    columnQuestionConfigs,
+    setColumnQuestionConfig
   } = useProcessing();
+  
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [questionConfigs, setQuestionConfigs] = useState<Record<number, any>>({});
   
   if (!uploadedFile || fileColumns.length === 0) {
     return null;
@@ -53,6 +64,14 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
   
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+  };
+
+  const handleQuestionConfigChange = (configs: Record<number, any>) => {
+    setQuestionConfigs(configs);
+    // Update the processing context with the configs
+    Object.entries(configs).forEach(([columnIndex, config]) => {
+      setColumnQuestionConfig(Number(columnIndex), config);
+    });
   };
   
   return (
@@ -100,6 +119,33 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
             </div>
           )}
         </div>
+
+        {selectedColumns.length > 0 && (
+          <div className="mt-6">
+            <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" className="w-full flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Advanced Configuration
+                  </div>
+                  {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 mt-4">
+                <MultiVariableQuestionMatrix
+                  selectedColumns={selectedColumns}
+                  onConfigurationChange={handleQuestionConfigChange}
+                />
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                  <SampleThresholdControl />
+                  <BrandListManager />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
       </CardContent>
       
       <ColumnSelectionSummary

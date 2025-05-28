@@ -1,4 +1,4 @@
-import { ProcessedResult, UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeEntry, CodeframeGenerationRules, TrackingStudyConfig, ColumnQuestionConfig } from '../types';
+import { ProcessedResult, UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeEntry, CodeframeGenerationRules, TrackingStudyConfig, ColumnQuestionConfig, BrandEntry } from '../types';
 
 export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellaneous';
 
@@ -55,4 +55,8 @@ export interface ProcessingContextType {
   applyToFullDataset: () => Promise<void>;
   downloadBinaryMatrix: () => void;
   downloadMoniglewCSV: () => Promise<void>;
+  columnQuestionConfigs: Record<number, ColumnQuestionConfig>;
+  brandList: BrandEntry[];
+  setColumnQuestionConfig: (columnIndex: number, config: ColumnQuestionConfig) => void;
+  saveBrandList: (brands: BrandEntry[]) => void;
 }

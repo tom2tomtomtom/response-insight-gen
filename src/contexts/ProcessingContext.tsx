@@ -38,6 +38,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isCodeframeFinalized, setIsCodeframeFinalized] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [columnQuestionConfigs, setColumnQuestionConfigs] = useState<Record<number, ColumnQuestionConfig>>({});
+  const [brandList, setBrandList] = useState<BrandEntry[]>([]);
 
   const { isUploading, setIsUploading, parseExcelFile, parseCSVFile } = useFileParsing();
   const { 
@@ -200,6 +201,14 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
+  const saveBrandList = (brands: BrandEntry[]) => {
+    setBrandList(brands);
+    toast({
+      title: "Brand List Saved",
+      description: `${brands.length} brands configured for normalization.`
+    });
+  };
+
   const resetState = () => {
     setUploadedFile(null);
     setIsUploading(false);
@@ -212,6 +221,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setIsRefinementMode(false);
     setIsCodeframeFinalized(false);
     setHasUnsavedChanges(false);
+    setColumnQuestionConfigs({});
+    setBrandList([]);
   };
 
   const finalizeCodeframe = () => {
@@ -380,6 +391,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     reprocessWithAI,
     applyToFullDataset,
     downloadBinaryMatrix,
+    columnQuestionConfigs,
+    brandList,
+    setColumnQuestionConfig,
+    saveBrandList,
     downloadMoniglewCSV: handleDownloadMoniglewCSV
   };
 

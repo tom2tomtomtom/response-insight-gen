@@ -4,178 +4,216 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
-import { Upload, Plus, Trash2, Building2 } from 'lucide-react';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
+import { Upload, Plus, Trash2, Building2, Info } from 'lucide-react';
+import { BrandEntry } from '../types';
 
-interface BrandEntry {
-  id: string;
-  name: string;
-  variants: string[];
-  system?: string;
-}
+const BrandListManager: React.FC = () => {
+  const [brandList, setBrandList] = useState<BrandEntry[]>([]);
+  const [brandInput, setBrandInput] = useState('');
+  const [systemInput, setSystemInput] = useState('');
+  const [showBulkInput, setShowBulkInput] = useState(false);
+  const [bulkBrandText, setBulkBrandText] = useState('');
 
-interface BrandListManagerProps {
-  onBrandListChange: (brands: BrandEntry[]) => void;
-  existingBrands?: BrandEntry[];
-}
-
-const BrandListManager: React.FC<BrandListManagerProps> = ({ 
-  onBrandListChange, 
-  existingBrands = [] 
-}) => {
-  const [brands, setBrands] = useState<BrandEntry[]>(existingBrands);
-  const [bulkInput, setBulkInput] = useState('');
-  const [newBrandName, setNewBrandName] = useState('');
-  const [newBrandSystem, setNewBrandSystem] = useState('');
-
-  const handleBulkPaste = () => {
-    const lines = bulkInput.split('\n').filter(line => line.trim());
-    const newBrands: BrandEntry[] = lines.map((line, index) => {
-      const [name, ...variants] = line.split(',').map(s => s.trim());
-      return {
-        id: `brand_${Date.now()}_${index}`,
-        name: name || `Brand ${brands.length + index + 1}`,
-        variants: variants.length > 0 ? variants : [name]
-      };
-    });
-    
-    const updatedBrands = [...brands, ...newBrands];
-    setBrands(updatedBrands);
-    onBrandListChange(updatedBrands);
-    setBulkInput('');
-  };
-
-  const addSingleBrand = () => {
-    if (!newBrandName.trim()) return;
+  const addBrand = () => {
+    if (!brandInput.trim()) return;
     
     const newBrand: BrandEntry = {
-      id: `brand_${Date.now()}`,
-      name: newBrandName.trim(),
-      variants: [newBrandName.trim()],
-      system: newBrandSystem.trim() || undefined
+      id: `brand-${Date.now()}`,
+      name: brandInput.trim(),
+      variants: [],
+      system: systemInput.trim() || undefined
     };
     
-    const updatedBrands = [...brands, newBrand];
-    setBrands(updatedBrands);
-    onBrandListChange(updatedBrands);
-    setNewBrandName('');
-    setNewBrandSystem('');
+    setBrandList(prev => [...prev, newBrand]);
+    setBrandInput('');
+    setSystemInput('');
   };
 
   const removeBrand = (id: string) => {
-    const updatedBrands = brands.filter(b => b.id !== id);
-    setBrands(updatedBrands);
-    onBrandListChange(updatedBrands);
+    setBrandList(prev => prev.filter(brand => brand.id !== id));
+  };
+
+  const processBulkBrands = () => {
+    const lines = bulkBrandText.split('\n').filter(line => line.trim());
+    const newBrands: BrandEntry[] = [];
+    
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed) {
+        // Check if line contains system info (format: "Brand Name | System Name")
+        const parts = trimmed.split('|').map(p => p.trim());
+        const brandName = parts[0];
+        const systemName = parts[1];
+        
+        newBrands.push({
+          id: `brand-${Date.now()}-${newBrands.length}`,
+          name: brandName,
+          variants: [],
+          system: systemName
+        });
+      }
+    });
+    
+    setBrandList(prev => [...prev, ...newBrands]);
+    setBulkBrandText('');
+    setShowBulkInput(false);
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      setBulkInput(text);
+      setBulkBrandText(text);
+      setShowBulkInput(true);
     };
     reader.readAsText(file);
   };
 
+  const groupedBrands = brandList.reduce((acc, brand) => {
+    const system = brand.system || 'Independent';
+    if (!acc[system]) acc[system] = [];
+    acc[system].push(brand);
+    return acc;
+  }, {} as Record<string, BrandEntry[]>);
+
   return (
-    <Card className="w-full">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-5 w-5" />
-          Brand List Management
+        <CardTitle className="text-base flex items-center gap-2">
+          <Building2 className="h-4 w-4" />
+          Brand List Manager
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <Alert>
-          <AlertDescription>
-            Add your brand list to normalize variants. Only brands mentioned by ≥3% of responses will be included in final codeframe.
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            Add brands to normalize responses. Use "|" to separate brand from system (e.g., "Hospital A | Health System B").
           </AlertDescription>
         </Alert>
 
-        {/* Bulk Input */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Bulk Add Brands</label>
-          <Textarea
-            placeholder="Paste brand list here (one per line, or comma-separated with variants)&#10;Example:&#10;McDonald's, McDonalds, McDonlds&#10;Burger King, BK&#10;KFC, Kentucky Fried Chicken"
-            value={bulkInput}
-            onChange={(e) => setBulkInput(e.target.value)}
-            rows={4}
-          />
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor="brand-input" className="text-xs font-medium">Brand/Hospital Name</Label>
+              <Input
+                id="brand-input"
+                placeholder="Enter brand name..."
+                value={brandInput}
+                onChange={(e) => setBrandInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addBrand()}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <Label htmlFor="system-input" className="text-xs font-medium">System (Optional)</Label>
+              <Input
+                id="system-input"
+                placeholder="Parent system..."
+                value={systemInput}
+                onChange={(e) => setSystemInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addBrand()}
+                className="h-9"
+              />
+            </div>
+          </div>
+          
           <div className="flex gap-2">
-            <Button onClick={handleBulkPaste} disabled={!bulkInput.trim()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Brands
+            <Button onClick={addBrand} disabled={!brandInput.trim()} size="sm" className="flex-1">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Brand
             </Button>
-            <Button variant="outline" asChild>
-              <label htmlFor="brand-file">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
-              </label>
+            
+            <div className="relative">
+              <input
+                type="file"
+                accept=".txt,.csv"
+                onChange={handleFileUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-1" />
+                Upload List
+              </Button>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowBulkInput(!showBulkInput)}
+            >
+              Bulk Add
             </Button>
-            <input
-              id="brand-file"
-              type="file"
-              accept=".txt,.csv"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
           </div>
         </div>
 
-        {/* Single Brand Input */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <Input
-            placeholder="Brand name"
-            value={newBrandName}
-            onChange={(e) => setNewBrandName(e.target.value)}
-          />
-          <Input
-            placeholder="System/Parent (optional)"
-            value={newBrandSystem}
-            onChange={(e) => setNewBrandSystem(e.target.value)}
-          />
-          <Button onClick={addSingleBrand} disabled={!newBrandName.trim()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add
-          </Button>
-        </div>
-
-        {/* Brand List Display */}
-        {brands.length > 0 && (
+        {showBulkInput && (
           <div className="space-y-2">
-            <label className="text-sm font-medium">Current Brand List ({brands.length})</label>
-            <div className="max-h-48 overflow-y-auto space-y-2 border rounded p-2">
-              {brands.map((brand) => (
-                <div key={brand.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <div>
-                    <div className="font-medium">{brand.name}</div>
-                    {brand.system && (
-                      <Badge variant="outline" className="text-xs">
-                        System: {brand.system}
-                      </Badge>
-                    )}
-                    {brand.variants.length > 1 && (
-                      <div className="text-xs text-muted-foreground">
-                        Variants: {brand.variants.slice(1).join(', ')}
-                      </div>
-                    )}
+            <Label className="text-xs font-medium">Bulk Brand Entry</Label>
+            <Textarea
+              placeholder="Enter brands, one per line. Use | to separate brand from system:&#10;Brand A | System 1&#10;Brand B | System 1&#10;Brand C"
+              value={bulkBrandText}
+              onChange={(e) => setBulkBrandText(e.target.value)}
+              className="min-h-[100px] text-sm"
+            />
+            <div className="flex gap-2">
+              <Button onClick={processBulkBrands} size="sm" disabled={!bulkBrandText.trim()}>
+                Process Brands
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowBulkInput(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {brandList.length > 0 && (
+          <div className="space-y-3 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Configured Brands</Label>
+              <Badge variant="outline" className="text-xs">
+                {brandList.length} brands
+              </Badge>
+            </div>
+            
+            <div className="space-y-3 max-h-48 overflow-y-auto">
+              {Object.entries(groupedBrands).map(([system, brands]) => (
+                <div key={system} className="space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    {system}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeBrand(brand.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="grid gap-1 pl-4">
+                    {brands.map((brand) => (
+                      <div key={brand.id} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                        <span>{brand.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          onClick={() => removeBrand(brand.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+
+        <div className="text-xs text-muted-foreground bg-amber-50 p-3 rounded-md">
+          <div className="font-medium text-amber-700 mb-1">3% Threshold Rule:</div>
+          <div>New brands will only be added to the codeframe if mentioned by ≥3% of responses.</div>
+        </div>
       </CardContent>
     </Card>
   );
