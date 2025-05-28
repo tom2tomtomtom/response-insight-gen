@@ -3,7 +3,7 @@ import React from 'react';
 import AiSky from './AiSky';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
-import { Settings2, FileCode, Home } from 'lucide-react';
+import { Settings2, FileCode, Home, Key } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
@@ -20,32 +20,19 @@ const Layout: React.FC<LayoutProps> = ({
   const location = useLocation();
   
   const handleConfigClick = () => {
-    console.log('Configure API button clicked');
-    if (location.pathname === '/') {
-      // If we're on the homepage, scroll to the API config section
-      setTimeout(() => {
-        const apiConfigElement = document.querySelector('#api-config-section');
-        console.log('API config element found:', apiConfigElement);
-        if (apiConfigElement) {
-          apiConfigElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-          });
-        } else {
-          console.log('API config element not found');
-        }
-      }, 100);
-    } else {
-      // Otherwise navigate to homepage
-      navigate('/');
-    }
+    navigate('/api-config');
   };
 
   const handleCodeframeUploadClick = () => {
     navigate('/upload-codeframe');
   };
 
-  return <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col relative">
+  const handleHomeClick = () => {
+    navigate('/');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col relative">
       <AiSky />
       
       <header className="bg-white/80 backdrop-blur-sm shadow-sm py-4 px-6 relative z-10">
@@ -56,8 +43,8 @@ const Layout: React.FC<LayoutProps> = ({
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">Alpha Version</span>
             
-            {location.pathname !== '/' && (
-              <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={() => navigate('/')}>
+            {location.pathname !== '/' && apiConfig?.isConfigured && (
+              <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={handleHomeClick}>
                 <Home className="h-4 w-4" />
                 Home
               </Button>
@@ -74,7 +61,7 @@ const Layout: React.FC<LayoutProps> = ({
               className={`flex items-center gap-1 ${apiConfig?.isConfigured ? 'border-green-500 text-green-600' : ''}`} 
               onClick={handleConfigClick}
             >
-              <Settings2 className="h-4 w-4" />
+              <Key className="h-4 w-4" />
               {apiConfig?.isConfigured ? "API Configured" : "Configure API"}
             </Button>
           </div>
@@ -90,7 +77,8 @@ const Layout: React.FC<LayoutProps> = ({
           &copy; {new Date().getFullYear()} Verbatim Coder - AI-Powered Survey Response Analysis
         </div>
       </footer>
-    </div>;
+    </div>
+  );
 };
 
 export default Layout;
