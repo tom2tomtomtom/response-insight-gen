@@ -53,7 +53,7 @@ const IndexContent: React.FC = () => {
     reprocessWithAI,
     applyToFullDataset,
     downloadBinaryMatrix,
-    setColumnQuestionType
+    setColumnQuestionConfig
   } = useProcessing();
   
   const [sampleThreshold, setSampleThreshold] = React.useState(30);
@@ -126,7 +126,7 @@ const IndexContent: React.FC = () => {
                 <MultiVariableQuestionMatrix
                   selectedColumns={selectedColumns}
                   fileColumns={fileColumns}
-                  onColumnConfigUpdate={setColumnQuestionType}
+                  onColumnConfigUpdate={setColumnQuestionConfig}
                 />
               )}
               

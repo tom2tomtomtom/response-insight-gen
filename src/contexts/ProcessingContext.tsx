@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeGenerationRules, TrackingStudyConfig } from '../types';
+import { UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeGenerationRules, TrackingStudyConfig, ColumnQuestionConfig } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { uploadFile, setUserResponses, setUploadedCodeframe } from '../services/api';
 import { debugLog } from '../utils/debug';
