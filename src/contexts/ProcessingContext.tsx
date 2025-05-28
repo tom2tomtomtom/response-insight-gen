@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeGenerationRules, TrackingStudyConfig, ColumnQuestionConfig } from '../types';
+import { UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeGenerationRules, TrackingStudyConfig, ColumnQuestionConfig, BrandEntry } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { uploadFile, setUserResponses, setUploadedCodeframe } from '../services/api';
 import { debugLog } from '../utils/debug';
@@ -255,7 +255,6 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     
     try {
       setProcessingStatus('Reprocessing with AI...');
-      // Simulate reprocessing
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       toast({
@@ -283,7 +282,6 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
 
     try {
       setProcessingStatus('Applying codeframe to full dataset...');
-      // Simulate full dataset processing
       await new Promise(resolve => setTimeout(resolve, 5000));
       
       toast({
@@ -302,7 +300,6 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const downloadBinaryMatrix = () => {
     if (!results) return;
     
-    // Create binary matrix data
     const binaryData = results.codedResponses.map(response => {
       const row: Record<string, any> = {
         'Response Text': response.responseText,
@@ -316,7 +313,6 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       return row;
     });
 
-    // Convert to CSV and download
     const headers = Object.keys(binaryData[0] || {});
     const csvContent = [
       headers.join(','),
@@ -366,6 +362,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     trackingConfig,
     isCodeframeFinalized,
     hasUnsavedChanges,
+    columnQuestionConfigs,
+    brandList,
     setApiConfig,
     testApiConnection: handleTestApiConnection,
     handleFileUpload,
@@ -391,9 +389,6 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     reprocessWithAI,
     applyToFullDataset,
     downloadBinaryMatrix,
-    columnQuestionConfigs,
-    brandList,
-    setColumnQuestionConfig,
     saveBrandList,
     downloadMoniglewCSV: handleDownloadMoniglewCSV
   };

@@ -12,8 +12,8 @@ import './styles/excel-table.css';
 
 function App() {
   return (
-    <BrowserRouter>
-      <ProcessingProvider>
+    <ProcessingProvider>
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/api-config" element={<ApiConfig />} />
@@ -22,8 +22,8 @@ function App() {
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
         <Toaster />
-      </ProcessingProvider>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ProcessingProvider>
   );
 }
 
