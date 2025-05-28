@@ -93,7 +93,7 @@ const ApiKeyConfig: React.FC = () => {
 
   return (
     <>
-      <Card className="w-full">
+      <Card className="w-full" id="api-config-section">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="h-5 w-5" />
