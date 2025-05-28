@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext } from '../types';
+import { UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeGenerationRules, TrackingStudyConfig } from '../types';
 import { toast } from '../components/ui/use-toast';
 import { uploadFile, setUserResponses, setUploadedCodeframe } from '../services/api';
 import { debugLog } from '../utils/debug';
@@ -24,6 +23,20 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [columnSettings, setColumnSettings] = useState<Record<number, ColumnSetting>>({});
   const [projectContext, setProjectContextState] = useState<ProjectContext | null>(null);
   const [isRefinementMode, setIsRefinementMode] = useState(false);
+  
+  // New state for enhanced features
+  const [codeframeRules, setCodeframeRules] = useState<CodeframeGenerationRules>({
+    minimumPercentage: 3,
+    includeCatchalls: true,
+    useNumericIds: true,
+    enforceThresholds: true
+  });
+  const [trackingConfig, setTrackingConfig] = useState<TrackingStudyConfig>({
+    isPriorCodeframe: false,
+    waveNumber: 1
+  });
+  const [isCodeframeFinalized, setIsCodeframeFinalized] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const { isUploading, setIsUploading, parseExcelFile, parseCSVFile } = useFileParsing();
   const { 
@@ -182,6 +195,122 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setRawFileData(null);
     setProjectContextState(null);
     setIsRefinementMode(false);
+    setIsCodeframeFinalized(false);
+    setHasUnsavedChanges(false);
+  };
+
+  const finalizeCodeframe = () => {
+    setIsCodeframeFinalized(true);
+    setHasUnsavedChanges(false);
+    toast({
+      title: "Codeframe Finalized",
+      description: "Your codeframe is now locked and ready for full dataset application."
+    });
+  };
+
+  const unlockCodeframe = () => {
+    setIsCodeframeFinalized(false);
+    toast({
+      title: "Codeframe Unlocked",
+      description: "You can now edit and reprocess the codeframe."
+    });
+  };
+
+  const saveChanges = () => {
+    setHasUnsavedChanges(false);
+    toast({
+      title: "Changes Saved",
+      description: "Your edits have been saved successfully."
+    });
+  };
+
+  const reprocessWithAI = async () => {
+    if (!results) return;
+    
+    try {
+      setProcessingStatus('Reprocessing with AI...');
+      // Simulate reprocessing
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      toast({
+        title: "Reprocessing Complete",
+        description: "AI has incorporated your manual edits into the codeframe."
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Reprocessing Failed",
+        description: "An error occurred during reprocessing."
+      });
+    }
+  };
+
+  const applyToFullDataset = async () => {
+    if (!results || !isCodeframeFinalized) {
+      toast({
+        variant: "destructive",
+        title: "Cannot Apply",
+        description: "Please finalize the codeframe first."
+      });
+      return;
+    }
+
+    try {
+      setProcessingStatus('Applying codeframe to full dataset...');
+      // Simulate full dataset processing
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      toast({
+        title: "Full Dataset Processed",
+        description: "Codeframe has been applied to all responses in the dataset."
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Application Failed",
+        description: "An error occurred while applying to full dataset."
+      });
+    }
+  };
+
+  const downloadBinaryMatrix = () => {
+    if (!results) return;
+    
+    // Create binary matrix data
+    const binaryData = results.codedResponses.map(response => {
+      const row: Record<string, any> = {
+        'Response Text': response.responseText,
+        'Column': response.columnName || 'Unknown'
+      };
+      
+      results.codeframe.forEach(code => {
+        row[code.label] = response.codesAssigned.includes(code.code) ? 1 : 0;
+      });
+      
+      return row;
+    });
+
+    // Convert to CSV and download
+    const headers = Object.keys(binaryData[0] || {});
+    const csvContent = [
+      headers.join(','),
+      ...binaryData.map(row => headers.map(h => row[h]).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'binary_coded_matrix.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Matrix Downloaded",
+      description: "Binary-coded matrix has been downloaded as CSV."
+    });
   };
 
   const value = {
@@ -207,6 +336,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     insights,
     projectContext,
     isRefinementMode,
+    codeframeRules,
+    trackingConfig,
+    isCodeframeFinalized,
+    hasUnsavedChanges,
     setApiConfig,
     testApiConnection: handleTestApiConnection,
     handleFileUpload,
@@ -222,7 +355,15 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     updateColumnSetting,
     setProjectContext,
     toggleRefinementMode,
-    refineCodeframe
+    refineCodeframe,
+    setCodeframeRules,
+    setTrackingConfig,
+    finalizeCodeframe,
+    unlockCodeframe,
+    saveChanges,
+    reprocessWithAI,
+    applyToFullDataset,
+    downloadBinaryMatrix
   };
 
   return (

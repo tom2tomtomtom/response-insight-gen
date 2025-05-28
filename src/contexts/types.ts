@@ -1,5 +1,5 @@
 
-import { ProcessedResult, UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeEntry } from '../types';
+import { ProcessedResult, UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeEntry, CodeframeGenerationRules, TrackingStudyConfig } from '../types';
 
 export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellaneous';
 
@@ -26,6 +26,10 @@ export interface ProcessingContextType {
   insights: string | null;
   projectContext: ProjectContext | null;
   isRefinementMode: boolean;
+  codeframeRules: CodeframeGenerationRules;
+  trackingConfig: TrackingStudyConfig;
+  isCodeframeFinalized: boolean;
+  hasUnsavedChanges: boolean;
   setApiConfig: (config: ApiConfig) => void;
   testApiConnection: (apiKey: string, apiUrl: string) => Promise<boolean>;
   handleFileUpload: (file: File) => Promise<void>;
@@ -42,4 +46,12 @@ export interface ProcessingContextType {
   setProjectContext: (context: ProjectContext | null) => void;
   toggleRefinementMode: () => void;
   refineCodeframe: (codeframe: CodeframeEntry[]) => Promise<void>;
+  setCodeframeRules: (rules: CodeframeGenerationRules) => void;
+  setTrackingConfig: (config: TrackingStudyConfig) => void;
+  finalizeCodeframe: () => void;
+  unlockCodeframe: () => void;
+  saveChanges: () => void;
+  reprocessWithAI: () => Promise<void>;
+  applyToFullDataset: () => Promise<void>;
+  downloadBinaryMatrix: () => void;
 }

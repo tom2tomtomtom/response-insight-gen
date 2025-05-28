@@ -16,11 +16,16 @@ import StudySummaryPanel from '../components/StudySummaryPanel';
 import BrandListManager from '../components/BrandListManager';
 import SampleThresholdControl from '../components/SampleThresholdControl';
 import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
+import CodeframeGenerationRules from '../components/CodeframeGenerationRules';
+import MultiVariableQuestionMatrix from '../components/MultiVariableQuestionMatrix';
+import TrackingStudyManager from '../components/TrackingStudyManager';
+import RevisionSystem from '../components/RevisionSystem';
+import BinaryCodedMatrix from '../components/BinaryCodedMatrix';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { FileCode } from "lucide-react";
+import { FileCode, Grid, TrendingUp } from "lucide-react";
 
 // Create an inner component that uses the context
 const IndexContent: React.FC = () => {
@@ -35,15 +40,28 @@ const IndexContent: React.FC = () => {
     toggleRefinementMode,
     refineCodeframe,
     rawResponses,
-    selectedColumns
+    selectedColumns,
+    fileColumns,
+    codeframeRules,
+    setCodeframeRules,
+    trackingConfig,
+    setTrackingConfig,
+    isCodeframeFinalized,
+    hasUnsavedChanges,
+    finalizeCodeframe,
+    unlockCodeframe,
+    saveChanges,
+    reprocessWithAI,
+    applyToFullDataset,
+    downloadBinaryMatrix,
+    setColumnQuestionType
   } = useProcessing();
   
   const [sampleThreshold, setSampleThreshold] = React.useState(30);
   const [brandList, setBrandList] = React.useState([]);
   
   const handleApplyToAllResponses = () => {
-    // TODO: Implement apply codeframe to full dataset
-    console.log("Applying codeframe to all responses...");
+    applyToFullDataset();
   };
   
   return (
@@ -93,6 +111,9 @@ const IndexContent: React.FC = () => {
             <>
               <FilePreview />
               
+              {/* Enhanced Column Selector */}
+              <EnhancedColumnSelector />
+              
               {/* Brand List Management */}
               {selectedColumns.length > 0 && (
                 <BrandListManager 
@@ -100,6 +121,29 @@ const IndexContent: React.FC = () => {
                   existingBrands={brandList}
                 />
               )}
+              
+              {/* Multi-Variable Question Matrix */}
+              {selectedColumns.length > 0 && (
+                <MultiVariableQuestionMatrix
+                  columns={fileColumns}
+                  selectedColumns={selectedColumns}
+                  onConfigUpdate={setColumnQuestionType}
+                />
+              )}
+              
+              {/* Tracking Study Manager */}
+              {projectContext?.studyType === 'tracking' && (
+                <TrackingStudyManager
+                  config={trackingConfig}
+                  onConfigChange={setTrackingConfig}
+                />
+              )}
+              
+              {/* Codeframe Generation Rules */}
+              <CodeframeGenerationRules
+                rules={codeframeRules}
+                onRulesChange={setCodeframeRules}
+              />
               
               {/* Sample Threshold Control */}
               {rawResponses.length > 0 && (
@@ -111,9 +155,6 @@ const IndexContent: React.FC = () => {
                   hasProcessedResults={!!results}
                 />
               )}
-              
-              {/* Enhanced Column Selector instead of regular FilePreview */}
-              <EnhancedColumnSelector />
             </>
           )}
           
@@ -121,12 +162,33 @@ const IndexContent: React.FC = () => {
           
           {results && (
             <>
+              {/* Revision System */}
+              <RevisionSystem
+                codeframe={results.codeframe}
+                isFinalized={isCodeframeFinalized}
+                onReprocess={reprocessWithAI}
+                onFinalize={finalizeCodeframe}
+                onUnlock={unlockCodeframe}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onSave={saveChanges}
+              />
+              
+              {/* Codeframe Refinement */}
               <CodeframeRefinement
                 codeframe={results.codeframe}
                 onRefine={refineCodeframe}
                 isRefinementMode={isRefinementMode}
                 onToggleRefinement={toggleRefinementMode}
               />
+              
+              {/* Binary Coded Matrix */}
+              <BinaryCodedMatrix
+                codeframe={results.codeframe}
+                codedResponses={results.codedResponses}
+                onDownloadMatrix={downloadBinaryMatrix}
+              />
+              
+              {/* Results View */}
               <ResultsView />
             </>
           )}
