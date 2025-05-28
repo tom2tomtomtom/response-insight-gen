@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -5,11 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useProcessing } from '../contexts/ProcessingContext';
-import { Layout } from '../components/Layout';
-import FileUpload from '../components/FileUpload';
-import ResultsDisplay from '../components/ResultsDisplay';
-import InsightsDisplay from '../components/InsightsDisplay';
-import OutputOptions from '../components/OutputOptions';
+import Layout from '../components/Layout';
+import FileUploader from '../components/FileUploader';
 import CodeframeApplication from '../components/CodeframeApplication';
 
 const Index = () => {
@@ -92,7 +90,7 @@ const Index = () => {
             </TabsList>
 
             <TabsContent value="upload" className="space-y-6">
-              <FileUpload />
+              <FileUploader />
             </TabsContent>
 
             <TabsContent value="processing" className="space-y-6">
@@ -114,7 +112,17 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="results" className="space-y-6">
-              <ResultsDisplay />
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">Analysis Results</h2>
+                {results ? (
+                  <div className="space-y-4">
+                    <p>Processing complete! {results.codedResponses.length} responses analyzed.</p>
+                    <Button onClick={downloadResults}>Download Results</Button>
+                  </div>
+                ) : (
+                  <p>No results available yet. Please run the analysis first.</p>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="codeframe-app" className="space-y-6">
@@ -122,11 +130,33 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="insights" className="space-y-6">
-              <InsightsDisplay />
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">AI Insights</h2>
+                {insights ? (
+                  <div className="bg-white rounded-lg p-4 shadow">
+                    <p className="text-gray-700">{insights}</p>
+                  </div>
+                ) : (
+                  <p>No insights available yet. Please run the analysis first.</p>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="output" className="space-y-6">
-              <OutputOptions />
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">Output Options</h2>
+                <div className="space-y-4">
+                  <Button onClick={downloadResults} disabled={!results}>
+                    Download Excel Results
+                  </Button>
+                  <Button onClick={downloadMoniglewCSV} disabled={!results}>
+                    Download Moniglew CSV
+                  </Button>
+                  <Button onClick={downloadBinaryMatrix} disabled={!results}>
+                    Download Binary Matrix
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
