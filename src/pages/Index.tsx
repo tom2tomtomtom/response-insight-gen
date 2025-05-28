@@ -12,6 +12,10 @@ import ResultsView from '../components/ResultsView';
 import ApiKeyConfig from '../components/ApiKeyConfig';
 import ProjectSetup from '../components/ProjectSetup';
 import CodeframeRefinement from '../components/CodeframeRefinement';
+import StudySummaryPanel from '../components/StudySummaryPanel';
+import BrandListManager from '../components/BrandListManager';
+import SampleThresholdControl from '../components/SampleThresholdControl';
+import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
 import { Link } from "react-router-dom";
@@ -29,8 +33,18 @@ const IndexContent: React.FC = () => {
     setProjectContext,
     isRefinementMode,
     toggleRefinementMode,
-    refineCodeframe
+    refineCodeframe,
+    rawResponses,
+    selectedColumns
   } = useProcessing();
+  
+  const [sampleThreshold, setSampleThreshold] = React.useState(30);
+  const [brandList, setBrandList] = React.useState([]);
+  
+  const handleApplyToAllResponses = () => {
+    // TODO: Implement apply codeframe to full dataset
+    console.log("Applying codeframe to all responses...");
+  };
   
   return (
     <div className="space-y-6">
@@ -47,6 +61,11 @@ const IndexContent: React.FC = () => {
           onComplete={setProjectContext}
           isConfigured={!!projectContext}
         />
+      )}
+      
+      {/* Study Summary Panel - show after upload */}
+      {uploadedFile && projectContext && (
+        <StudySummaryPanel />
       )}
       
       {/* Only show the rest of the content if API and project context are configured */}
@@ -70,7 +89,33 @@ const IndexContent: React.FC = () => {
         <div className="space-y-6">
           {!uploadedFile && projectContext && <FileUploader />}
           
-          {uploadedFile && !results && processingProgress === 0 && <FilePreview />}
+          {uploadedFile && !results && processingProgress === 0 && (
+            <>
+              <FilePreview />
+              
+              {/* Brand List Management */}
+              {selectedColumns.length > 0 && (
+                <BrandListManager 
+                  onBrandListChange={setBrandList}
+                  existingBrands={brandList}
+                />
+              )}
+              
+              {/* Sample Threshold Control */}
+              {rawResponses.length > 0 && (
+                <SampleThresholdControl
+                  totalResponses={rawResponses.length}
+                  currentThreshold={sampleThreshold}
+                  onThresholdChange={setSampleThreshold}
+                  onApplyToAll={handleApplyToAllResponses}
+                  hasProcessedResults={!!results}
+                />
+              )}
+              
+              {/* Enhanced Column Selector instead of regular FilePreview */}
+              <EnhancedColumnSelector />
+            </>
+          )}
           
           {processingProgress > 0 && <ProcessingStatus />}
           

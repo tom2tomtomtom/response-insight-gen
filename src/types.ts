@@ -1,4 +1,3 @@
-
 export interface UploadedFile {
   id?: string;
   filename: string;
@@ -104,4 +103,38 @@ export interface ColumnSetting {
 export interface UploadedCodeframe {
   name: string;
   entries: CodeframeEntry[];
+}
+
+export interface BrandEntry {
+  id: string;
+  name: string;
+  variants: string[];
+  system?: string;
+}
+
+export interface ColumnQuestionConfig {
+  questionType: string;
+  fullQuestionText: string;
+  hasExistingCodeframe: boolean;
+  codeframeFile?: File;
+}
+
+export interface EnhancedColumnSetting extends ColumnSetting {
+  questionConfig?: ColumnQuestionConfig;
+  brandList?: BrandEntry[];
+  samplingThreshold?: number;
+  fullQuestionText?: string;
+}
+
+export interface TrackingStudyConfig {
+  isPriorCodeframe: boolean;
+  priorCodeframe?: CodeframeEntry[];
+  waveNumber?: number;
+}
+
+export interface CodeframeGenerationRules {
+  minimumPercentage: number; // Default 3%
+  includeCatchalls: boolean; // Always include Other, None, N/A
+  useNumericIds: boolean; // Use numeric IDs only
+  enforceThresholds: boolean;
 }
