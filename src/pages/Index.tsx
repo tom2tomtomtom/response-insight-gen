@@ -4,10 +4,11 @@ import Layout from '../components/Layout';
 import IntroCard from '../components/IntroCard';
 import ApiKeyConfig from '../components/ApiKeyConfig';
 import FileUploader from '../components/FileUploader';
+import ColumnSelector from '../components/ColumnSelector';
 import { useProcessing } from '../contexts/ProcessingContext';
 
 const Index: React.FC = () => {
-  const { apiConfig } = useProcessing();
+  const { apiConfig, uploadedFile, fileColumns } = useProcessing();
 
   return (
     <Layout>
@@ -20,9 +21,19 @@ const Index: React.FC = () => {
         </div>
 
         {/* File Upload Section - only show if API is configured */}
-        {apiConfig?.isConfigured && (
+        {apiConfig?.isConfigured && !uploadedFile && (
           <div className="w-full max-w-4xl mx-auto">
             <FileUploader />
+          </div>
+        )}
+
+        {/* Column Selection Section - show after file is uploaded */}
+        {apiConfig?.isConfigured && uploadedFile && fileColumns && fileColumns.length > 0 && (
+          <div className="w-full max-w-6xl mx-auto">
+            <ColumnSelector onContinueToAnalysis={() => {
+              // This will be handled by the ColumnSelector component itself
+              console.log('Continuing to analysis...');
+            }} />
           </div>
         )}
       </div>
