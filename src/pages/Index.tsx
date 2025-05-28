@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +10,7 @@ import FileUploader from '../components/FileUploader';
 import ColumnSelector from '../components/ColumnSelector';
 import CodeframeApplication from '../components/CodeframeApplication';
 import ResultsView from '../components/ResultsView';
+import EnhancedProcessingStatus from '../components/EnhancedProcessingStatus';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("upload");
@@ -74,6 +74,23 @@ const Index = () => {
     setActiveTab("processing");
   };
 
+  // Auto-navigate to results when processing completes
+  useEffect(() => {
+    if (!isProcessing && processingProgress === 100 && results) {
+      // Small delay to show completion state briefly
+      const timer = setTimeout(() => {
+        setActiveTab("results");
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isProcessing, processingProgress, results]);
+
+  // Enhanced start processing with navigation callback
+  const handleStartProcessing = async () => {
+    await startProcessing();
+  };
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -105,11 +122,15 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="processing" className="space-y-6">
+              {/* Enhanced Processing Status */}
+              <EnhancedProcessingStatus />
+              
               <div>
                 {isProcessing ? (
-                  <div className="text-center">
-                    <p>{processingStatus}</p>
-                    <progress value={processingProgress} max="100" className="w-full h-4"></progress>
+                  <div className="text-center mt-6">
+                    <p className="text-muted-foreground">
+                      Your analysis is running. Feel free to watch the progress above or check back in a few minutes.
+                    </p>
                   </div>
                 ) : (
                   <div className="text-center">
@@ -120,7 +141,7 @@ const Index = () => {
                     ) : (
                       <>
                         <p>Ready to start processing {selectedColumns.length} selected column{selectedColumns.length !== 1 ? 's' : ''}?</p>
-                        <Button onClick={startProcessing} disabled={isProcessing || !uploadedFile}>
+                        <Button onClick={handleStartProcessing} disabled={isProcessing || !uploadedFile}>
                           Start Processing
                         </Button>
                       </>

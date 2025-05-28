@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
@@ -16,7 +15,7 @@ const FilePreview: React.FC = () => {
   
   // If we have file columns, use the column selector
   if (fileColumns.length > 0) {
-    return <ColumnSelector />;
+    return <ColumnSelector onContinueToAnalysis={() => {}} />;
   }
   
   // Fallback to the old preview if no column data
