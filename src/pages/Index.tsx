@@ -1,210 +1,137 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/components/ui/use-toast"
 import { useProcessing } from '../contexts/ProcessingContext';
-import { ProcessingProvider } from '../contexts/ProcessingContext';
-import Layout from '../components/Layout';
-import IntroCard from '../components/IntroCard';
-import WorkflowSteps from '../components/WorkflowSteps';
-import FileUploader from '../components/FileUploader';
-import FilePreview from '../components/FilePreview';
-import ProcessingStatus from '../components/ProcessingStatus';
-import ResultsView from '../components/ResultsView';
-import ApiKeyConfig from '../components/ApiKeyConfig';
-import ProjectSetup from '../components/ProjectSetup';
-import CodeframeRefinement from '../components/CodeframeRefinement';
-import StudySummaryPanel from '../components/StudySummaryPanel';
-import BrandListManager from '../components/BrandListManager';
-import SampleThresholdControl from '../components/SampleThresholdControl';
-import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
-import CodeframeGenerationRules from '../components/CodeframeGenerationRules';
-import MultiVariableQuestionMatrix from '../components/MultiVariableQuestionMatrix';
-import TrackingStudyManager from '../components/TrackingStudyManager';
-import RevisionSystem from '../components/RevisionSystem';
-import BinaryCodedMatrix from '../components/BinaryCodedMatrix';
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { InfoCircledIcon } from "@radix-ui/react-icons";
-import { Link } from "react-router-dom";
-import { Button } from "../components/ui/button";
-import { FileCode, Grid, TrendingUp } from "lucide-react";
+import { Layout } from '../components/Layout';
+import FileUpload from '../components/FileUpload';
+import ResultsDisplay from '../components/ResultsDisplay';
+import InsightsDisplay from '../components/InsightsDisplay';
+import OutputOptions from '../components/OutputOptions';
+import CodeframeApplication from '../components/CodeframeApplication';
 
-// Create an inner component that uses the context
-const IndexContent: React.FC = () => {
+const Index = () => {
   const { 
-    uploadedFile, 
-    results, 
-    processingProgress, 
-    apiConfig, 
-    projectContext, 
-    setProjectContext,
-    isRefinementMode,
-    toggleRefinementMode,
-    refineCodeframe,
+    uploadedFile,
+    isUploading,
+    isProcessing,
+    processingStatus,
+    processingProgress,
+    results,
+    isGeneratingExcel,
     rawResponses,
-    selectedColumns,
+    apiConfig,
     fileColumns,
+    selectedColumns,
+    searchQuery,
+    uploadedCodeframes,
+    uploadedCodeframe,
+    activeCodeframe,
+    rawFileData,
+    columnQuestionTypes,
+    columnSettings,
+    multipleCodeframes,
+    insights,
+    projectContext,
+    isRefinementMode,
     codeframeRules,
-    setCodeframeRules,
     trackingConfig,
-    setTrackingConfig,
     isCodeframeFinalized,
     hasUnsavedChanges,
+    setApiConfig,
+    testApiConnection,
+    handleFileUpload,
+    startProcessing,
+    downloadResults,
+    resetState,
+    toggleColumnSelection,
+    selectMultipleColumns,
+    setSearchQuery,
+    saveUploadedCodeframe,
+    setActiveCodeframe,
+    setColumnQuestionType,
+    setColumnQuestionConfig,
+    updateColumnSetting,
+    setProjectContext,
+    toggleRefinementMode,
+    refineCodeframe,
+    setCodeframeRules,
+    setTrackingConfig,
     finalizeCodeframe,
     unlockCodeframe,
     saveChanges,
     reprocessWithAI,
     applyToFullDataset,
     downloadBinaryMatrix,
-    setColumnQuestionConfig
+    downloadMoniglewCSV
   } = useProcessing();
-  
-  const [sampleThreshold, setSampleThreshold] = React.useState(30);
-  const [brandList, setBrandList] = React.useState([]);
-  
-  const handleApplyToAllResponses = () => {
-    applyToFullDataset();
-  };
-  
+
   return (
-    <div className="space-y-6">
-      {/* Always show API config first if not configured */}
-      {!apiConfig?.isConfigured && (
-        <div id="api-config-section">
-          <ApiKeyConfig />
-        </div>
-      )}
-      
-      {/* Project Setup - show after API is configured but before project context is set */}
-      {apiConfig?.isConfigured && !projectContext && (
-        <ProjectSetup 
-          onComplete={setProjectContext}
-          isConfigured={!!projectContext}
-        />
-      )}
-      
-      {/* Study Summary Panel - show after upload */}
-      {uploadedFile && projectContext && (
-        <StudySummaryPanel />
-      )}
-      
-      {/* Only show the rest of the content if API and project context are configured */}
-      <div className={`${(!apiConfig?.isConfigured || !projectContext) ? 'opacity-50 pointer-events-none' : ''}`}>
-        {!uploadedFile && projectContext && (
-          <>
-            <IntroCard />
-            <div className="flex justify-end mb-4">
-              <Button variant="outline" asChild className="flex items-center gap-2">
-                <Link to="/upload-codeframe">
-                  <FileCode className="h-4 w-4" />
-                  <span>Upload Existing Codeframe</span>
-                </Link>
-              </Button>
-            </div>
-          </>
-        )}
-        
-        <WorkflowSteps />
-        
-        <div className="space-y-6">
-          {!uploadedFile && projectContext && <FileUploader />}
-          
-          {uploadedFile && !results && processingProgress === 0 && (
-            <>
-              <FilePreview />
-              
-              {/* Enhanced Column Selector */}
-              <EnhancedColumnSelector />
-              
-              {/* Brand List Management */}
-              {selectedColumns.length > 0 && (
-                <BrandListManager 
-                  onBrandListChange={setBrandList}
-                  existingBrands={brandList}
-                />
-              )}
-              
-              {/* Multi-Variable Question Matrix */}
-              {selectedColumns.length > 0 && (
-                <MultiVariableQuestionMatrix
-                  selectedColumns={selectedColumns}
-                  fileColumns={fileColumns}
-                  onColumnConfigUpdate={setColumnQuestionConfig}
-                />
-              )}
-              
-              {/* Tracking Study Manager */}
-              {projectContext?.studyType === 'tracking' && (
-                <TrackingStudyManager
-                  config={trackingConfig}
-                  onConfigChange={setTrackingConfig}
-                />
-              )}
-              
-              {/* Codeframe Generation Rules */}
-              <CodeframeGenerationRules
-                rules={codeframeRules}
-                onRulesChange={setCodeframeRules}
-              />
-              
-              {/* Sample Threshold Control */}
-              {rawResponses.length > 0 && (
-                <SampleThresholdControl
-                  totalResponses={rawResponses.length}
-                  currentThreshold={sampleThreshold}
-                  onThresholdChange={setSampleThreshold}
-                  onApplyToAll={handleApplyToAllResponses}
-                  hasProcessedResults={!!results}
-                />
-              )}
-            </>
-          )}
-          
-          {processingProgress > 0 && <ProcessingStatus />}
-          
-          {results && (
-            <>
-              {/* Revision System */}
-              <RevisionSystem
-                codeframe={results.codeframe}
-                isFinalized={isCodeframeFinalized}
-                onReprocess={reprocessWithAI}
-                onFinalize={finalizeCodeframe}
-                onUnlock={unlockCodeframe}
-                hasUnsavedChanges={hasUnsavedChanges}
-                onSave={saveChanges}
-              />
-              
-              {/* Codeframe Refinement */}
-              <CodeframeRefinement
-                codeframe={results.codeframe}
-                onRefine={refineCodeframe}
-                isRefinementMode={isRefinementMode}
-                onToggleRefinement={toggleRefinementMode}
-              />
-              
-              {/* Binary Coded Matrix */}
-              <BinaryCodedMatrix
-                codeframe={results.codeframe}
-                codedResponses={results.codedResponses}
-                onDownloadMatrix={downloadBinaryMatrix}
-              />
-              
-              {/* Results View */}
-              <ResultsView />
-            </>
-          )}
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              Qualitative Data Analysis Platform
+            </h1>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Transform your open-ended survey responses into actionable insights with AI-powered coding and analysis
+            </p>
+          </div>
+
+          <Tabs defaultValue="upload" className="w-full">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="upload">Upload & Setup</TabsTrigger>
+              <TabsTrigger value="processing">Analysis</TabsTrigger>
+              <TabsTrigger value="results">Results</TabsTrigger>
+              <TabsTrigger value="codeframe-app">Apply Codeframe</TabsTrigger>
+              <TabsTrigger value="insights">Insights</TabsTrigger>
+              <TabsTrigger value="output">Output</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="upload" className="space-y-6">
+              <FileUpload />
+            </TabsContent>
+
+            <TabsContent value="processing" className="space-y-6">
+              <div>
+                {isProcessing ? (
+                  <div className="text-center">
+                    <p>{processingStatus}</p>
+                    <progress value={processingProgress} max="100" className="w-full h-4"></progress>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p>Ready to start processing?</p>
+                    <Button onClick={startProcessing} disabled={isProcessing || !uploadedFile}>
+                      Start Processing
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="results" className="space-y-6">
+              <ResultsDisplay />
+            </TabsContent>
+
+            <TabsContent value="codeframe-app" className="space-y-6">
+              <CodeframeApplication />
+            </TabsContent>
+
+            <TabsContent value="insights" className="space-y-6">
+              <InsightsDisplay />
+            </TabsContent>
+
+            <TabsContent value="output" className="space-y-6">
+              <OutputOptions />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
-    </div>
-  );
-};
-
-// Main Index component wraps everything with the needed providers
-const Index: React.FC = () => {
-  return (
-    <ProcessingProvider>
-      <Layout>
-        <IndexContent />
-      </Layout>
-    </ProcessingProvider>
+    </Layout>
   );
 };
 

@@ -138,3 +138,35 @@ export interface CodeframeGenerationRules {
   useNumericIds: boolean; // Use numeric IDs only
   enforceThresholds: boolean;
 }
+
+export interface CodeframeApplicationRule {
+  questionId: string;
+  codeLabel: string;
+  codeId: string;
+  hierarchy: 'Grand Net' | 'Net' | 'Subnet';
+  group?: string;
+  keywords?: string[];
+  semanticMatches?: string[];
+}
+
+export interface AppliedCode {
+  code_id: string;
+  label: string;
+  hierarchy: string;
+  group?: string;
+  confidence?: number;
+}
+
+export interface CodedVerbatimResponse {
+  respondent_id: string;
+  question_id: string;
+  response: string;
+  codes_applied: AppliedCode[];
+}
+
+export interface CodeframeApplicationResult {
+  codedResponses: CodedVerbatimResponse[];
+  moniglewCsv: string;
+  questionsProcessed: number;
+  responsesProcessed: number;
+}
