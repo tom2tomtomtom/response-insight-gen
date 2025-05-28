@@ -33,8 +33,7 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
     setColumnQuestionConfig
   } = useProcessing();
   
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const [questionConfigs, setQuestionConfigs] = useState<Record<number, any>>({});
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(true); // Default to open to show features
   
   if (!uploadedFile || fileColumns.length === 0) {
     return null;
@@ -67,7 +66,6 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
   };
 
   const handleQuestionConfigChange = (configs: Record<number, any>) => {
-    setQuestionConfigs(configs);
     // Update the processing context with the configs
     Object.entries(configs).forEach(([columnIndex, config]) => {
       setColumnQuestionConfig(Number(columnIndex), config);
@@ -75,85 +73,92 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
   };
   
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>Column Selection</span>
-          <Badge variant="outline" className="ml-2">
-            {uploadedFile.filename}
-          </Badge>
-        </CardTitle>
-        <CardDescription>
-          Select the {textColumnCount} text columns you want to analyze for open-ended responses.
-        </CardDescription>
+    <div className="space-y-6">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex justify-between items-center">
+            <span>Column Selection</span>
+            <Badge variant="outline" className="ml-2">
+              {uploadedFile.filename}
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Select the {textColumnCount} text columns you want to analyze for open-ended responses.
+          </CardDescription>
+          
+          <ColumnSearchControls
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            filteredColumns={filteredColumns}
+            selectedColumns={selectedColumns}
+            onSelectAllFiltered={handleSelectAllFiltered}
+          />
+        </CardHeader>
         
-        <ColumnSearchControls
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          filteredColumns={filteredColumns}
-          selectedColumns={selectedColumns}
-          onSelectAllFiltered={handleSelectAllFiltered}
-        />
-      </CardHeader>
-      
-      <CardContent>
-        {activeCodeframe && (
-          <ActiveCodeframeDisplay activeCodeframe={activeCodeframe} />
-        )}
-        
-        <QuickStartAlert />
-        
-        <div className="space-y-4">
-          {filteredColumns.length > 0 ? (
-            filteredColumns.map((column) => (
-              <ColumnCard
-                key={column.index}
-                column={column}
-                isSelected={selectedColumns.includes(column.index)}
-                onToggle={toggleColumnSelection}
-              />
-            ))
-          ) : (
-            <div className="p-6 text-center text-muted-foreground">
-              No columns match your search
-            </div>
+        <CardContent>
+          {activeCodeframe && (
+            <ActiveCodeframeDisplay activeCodeframe={activeCodeframe} />
           )}
-        </div>
+          
+          <QuickStartAlert />
+          
+          <div className="space-y-4">
+            {filteredColumns.length > 0 ? (
+              filteredColumns.map((column) => (
+                <ColumnCard
+                  key={column.index}
+                  column={column}
+                  isSelected={selectedColumns.includes(column.index)}
+                  onToggle={toggleColumnSelection}
+                />
+              ))
+            ) : (
+              <div className="p-6 text-center text-muted-foreground">
+                No columns match your search
+              </div>
+            )}
+          </div>
+        </CardContent>
+        
+        <ColumnSelectionSummary
+          selectedCount={selectedCount}
+          activeCodeframe={activeCodeframe}
+          onContinueToAnalysis={onContinueToAnalysis}
+        />
+      </Card>
 
-        {selectedColumns.length > 0 && (
-          <div className="mt-6">
+      {/* Enhanced Configuration Section - Always visible when columns are selected */}
+      {selectedColumns.length > 0 && (
+        <Card className="w-full">
+          <CardHeader>
             <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
               <CollapsibleTrigger asChild>
                 <Button variant="outline" className="w-full flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Settings className="h-4 w-4" />
-                    Advanced Configuration
+                    Enhanced Configuration & Question Setup
                   </div>
                   {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 mt-4">
+              <CollapsibleContent className="space-y-6 mt-6">
+                {/* Multi-Variable Question Matrix */}
                 <MultiVariableQuestionMatrix
                   selectedColumns={selectedColumns}
                   onConfigurationChange={handleQuestionConfigChange}
                 />
                 
-                <div className="grid md:grid-cols-2 gap-4">
+                {/* Sample & Brand Controls */}
+                <div className="grid md:grid-cols-2 gap-6">
                   <SampleThresholdControl />
                   <BrandListManager />
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          </div>
-        )}
-      </CardContent>
-      
-      <ColumnSelectionSummary
-        selectedCount={selectedCount}
-        activeCodeframe={activeCodeframe}
-        onContinueToAnalysis={onContinueToAnalysis}
-      />
-    </Card>
+          </CardHeader>
+        </Card>
+      )}
+    </div>
   );
 };
 
