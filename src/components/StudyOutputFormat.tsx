@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
@@ -7,19 +6,21 @@ import { Button } from './ui/button';
 import { FileSpreadsheet, BarChart3, Download } from 'lucide-react';
 import { ProcessedResult } from '../types';
 import { MoniglewStyleFormatter } from '../utils/moniglewStyleFormatter';
-
 interface StudyOutputFormatProps {
   results: ProcessedResult;
   studyId?: string;
 }
-
-const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({ results, studyId = "20250128" }) => {
+const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({
+  results,
+  studyId = "20250128"
+}) => {
   const formatter = useMemo(() => new MoniglewStyleFormatter(results), [results]);
   const columnMetadata = useMemo(() => formatter.getColumnMetadata(), [formatter]);
-  
   const handleDownloadMoniglewCSV = () => {
     const csv = formatter.generateCSV();
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8;'
+    });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -34,13 +35,10 @@ const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({ results, studyId 
   const verbatimColumns = columnMetadata.filter(meta => meta.column.type === 'verbatim');
   const codeColumns = columnMetadata.filter(meta => meta.column.type === 'code');
   const thematicColumns = columnMetadata.filter(meta => meta.column.type === 'thematic');
-
   const grandNets = thematicColumns.filter(meta => meta.column.hierarchyLevel === 'Grand Net');
   const nets = thematicColumns.filter(meta => meta.column.hierarchyLevel === 'Net');
   const subnets = thematicColumns.filter(meta => meta.column.hierarchyLevel === 'Subnet');
-
-  return (
-    <Card className="w-full">
+  return <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -96,19 +94,14 @@ const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({ results, studyId 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {columnMetadata.slice(0, 15).map((meta, index) => (
-                  <TableRow key={index}>
+                {columnMetadata.slice(0, 15).map((meta, index) => <TableRow key={index}>
                     <TableCell className="font-mono text-sm max-w-[300px]">
                       <div className="truncate" title={meta.column.name}>
                         {meta.column.name}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={
-                        meta.column.type === 'verbatim' ? 'default' :
-                        meta.column.type === 'code' ? 'secondary' :
-                        'outline'
-                      }>
+                      <Badge variant={meta.column.type === 'verbatim' ? 'default' : meta.column.type === 'code' ? 'secondary' : 'outline'}>
                         {meta.column.type}
                       </Badge>
                     </TableCell>
@@ -116,35 +109,27 @@ const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({ results, studyId 
                       <Badge variant="outline">{meta.column.dataType}</Badge>
                     </TableCell>
                     <TableCell>
-                      {meta.column.hierarchyLevel && (
-                        <Badge variant="secondary" className="text-xs">
+                      {meta.column.hierarchyLevel && <Badge variant="secondary" className="text-xs">
                           {meta.column.hierarchyLevel}
-                        </Badge>
-                      )}
+                        </Badge>}
                     </TableCell>
                     <TableCell className="max-w-[200px]">
                       <div className="text-xs text-muted-foreground truncate">
-                        {meta.sampleValues.length > 0 
-                          ? meta.sampleValues.slice(0, 2).join(', ')
-                          : 'No data'
-                        }
+                        {meta.sampleValues.length > 0 ? meta.sampleValues.slice(0, 2).join(', ') : 'No data'}
                       </div>
                     </TableCell>
-                  </TableRow>
-                ))}
+                  </TableRow>)}
               </TableBody>
             </Table>
           </div>
           
-          {columnMetadata.length > 15 && (
-            <p className="text-center text-sm text-muted-foreground">
+          {columnMetadata.length > 15 && <p className="text-center text-sm text-muted-foreground">
               ... and {columnMetadata.length - 15} more columns including all thematic hierarchies
-            </p>
-          )}
+            </p>}
         </div>
 
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <h4 className="font-medium text-blue-900 mb-2">Moniglew Format Specifications</h4>
+          <h4 className="font-medium text-blue-900 mb-2">Monigle Format Specifications</h4>
           <ul className="text-sm text-blue-800 space-y-1">
             <li>• Column naming: <code>&lt;QID&gt;*&lt;Theme Description&gt; (&lt;Hierarchy Level&gt;)*\[Code Number]</code></li>
             <li>• Verbatim columns contain raw response text</li>
@@ -154,8 +139,6 @@ const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({ results, studyId 
           </ul>
         </div>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 };
-
 export default StudyOutputFormat;
