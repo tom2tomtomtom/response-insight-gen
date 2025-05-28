@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { ProcessedResult, UploadedFile, ApiConfig, CodeframeEntry } from '../types';
 import { toast } from '../components/ui/use-toast';
@@ -192,7 +193,7 @@ export const useProcessingManagement = () => {
       insights += `Key Findings:\n`;
       topCodes.forEach((item, index) => {
         const codeInfo = results.codeframe.find(c => c.code === item.code);
-        const codeName = codeInfo?.name || item.code;
+        const codeName = codeInfo?.label || item.code;
         insights += `${index + 1}. ${codeName}: Mentioned in ${item.percentage}% of responses (${item.count} mentions)\n`;
       });
       insights += `\n`;
