@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
@@ -17,6 +16,8 @@ import CodeframeTable from './results/CodeframeTable';
 import BrandHierarchyTable from './results/BrandHierarchyTable';
 import AttributeThemesTable from './results/AttributeThemesTable';
 import CodedResponsesTable from './results/CodedResponsesTable';
+import StudyOutputFormat from './StudyOutputFormat';
+import BinaryCodedMatrix from './BinaryCodedMatrix';
 
 const ResultsView: React.FC = () => {
   const { 
@@ -28,7 +29,8 @@ const ResultsView: React.FC = () => {
     apiConfig,
     rawFileData,
     multipleCodeframes,
-    insights
+    insights,
+    downloadBinaryMatrix
   } = useProcessing();
   
   const [searchFilter, setSearchFilter] = useState('');
@@ -180,11 +182,17 @@ const ResultsView: React.FC = () => {
           <CodeSummaryChart codeSummary={currentCodeSummary} />
         )}
       
-        <Tabs defaultValue="codeframe">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="output-format">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="output-format">Output Format</TabsTrigger>
             <TabsTrigger value="codeframe">Codeframe</TabsTrigger>
             <TabsTrigger value="responses">Coded Responses</TabsTrigger>
+            <TabsTrigger value="binary-matrix">Binary Matrix</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="output-format" className="mt-4">
+            <StudyOutputFormat results={results} />
+          </TabsContent>
           
           <TabsContent value="codeframe" className="mt-4">
             {/* Display hierarchies or themes if available */}
@@ -278,6 +286,14 @@ const ResultsView: React.FC = () => {
               hasMultipleCodeframes={hasMultipleCodeframes}
               codeframe={results.codeframe}
               multipleCodeframes={multipleCodeframes}
+            />
+          </TabsContent>
+          
+          <TabsContent value="binary-matrix" className="mt-4">
+            <BinaryCodedMatrix 
+              codeframe={currentCodeframe}
+              codedResponses={filteredResponses}
+              onDownloadMatrix={downloadBinaryMatrix}
             />
           </TabsContent>
         </Tabs>

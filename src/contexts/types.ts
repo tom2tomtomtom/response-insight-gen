@@ -1,5 +1,5 @@
 
-import { ProcessedResult, UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeEntry, CodeframeGenerationRules, TrackingStudyConfig } from '../types';
+import { ProcessedResult, UploadedFile, ApiConfig, ColumnInfo, UploadedCodeframe, ColumnSetting, ProjectContext, CodeframeEntry, CodeframeGenerationRules, TrackingStudyConfig, ColumnQuestionConfig } from '../types';
 
 export type QuestionType = 'brand_awareness' | 'brand_description' | 'miscellaneous';
 
@@ -42,6 +42,7 @@ export interface ProcessingContextType {
   saveUploadedCodeframe: (codeframe: UploadedCodeframe) => void;
   setActiveCodeframe: (codeframe: UploadedCodeframe | null) => void;
   setColumnQuestionType: (columnIndex: number, questionType: string) => void;
+  setColumnQuestionConfig: (columnIndex: number, config: ColumnQuestionConfig) => void;
   updateColumnSetting: (columnIndex: number, setting: keyof ColumnSetting, value: boolean) => void;
   setProjectContext: (context: ProjectContext | null) => void;
   toggleRefinementMode: () => void;

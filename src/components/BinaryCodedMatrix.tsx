@@ -20,7 +20,7 @@ const BinaryCodedMatrix: React.FC<BinaryCodedMatrixProps> = ({
   // Create binary matrix
   const createBinaryMatrix = () => {
     return codedResponses.map(response => {
-      const row: Record<string, number> = {
+      const row: Record<string, string | number> = {
         ResponseText: response.responseText
       };
       
@@ -75,7 +75,7 @@ const BinaryCodedMatrix: React.FC<BinaryCodedMatrixProps> = ({
                 {previewRows.map((row, index) => (
                   <TableRow key={index}>
                     <TableCell className="max-w-[200px] truncate">
-                      {row.ResponseText as string}
+                      {String(row.ResponseText)}
                     </TableCell>
                     {codeframe.map(code => (
                       <TableCell key={code.code} className="text-center">

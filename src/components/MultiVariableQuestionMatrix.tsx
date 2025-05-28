@@ -3,172 +3,147 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
-import { Switch } from './ui/switch';
 import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Plus, Trash2, Upload, Grid } from 'lucide-react';
-import { ColumnQuestionConfig } from '../types';
+import { Textarea } from './ui/textarea';
+import { Upload, Plus, Trash2, Grid3X3 } from 'lucide-react';
+import { ColumnQuestionConfig, ColumnInfo } from '../types';
 
 interface MultiVariableQuestionMatrixProps {
-  columns: any[];
   selectedColumns: number[];
-  onConfigUpdate: (columnIndex: number, config: ColumnQuestionConfig) => void;
+  fileColumns: ColumnInfo[];
+  onColumnConfigUpdate: (columnIndex: number, config: ColumnQuestionConfig) => void;
 }
 
 const MultiVariableQuestionMatrix: React.FC<MultiVariableQuestionMatrixProps> = ({
-  columns,
   selectedColumns,
-  onConfigUpdate
+  fileColumns,
+  onColumnConfigUpdate
 }) => {
-  const [questions, setQuestions] = useState<Record<number, ColumnQuestionConfig[]>>({});
+  const [columnConfigs, setColumnConfigs] = useState<Record<number, ColumnQuestionConfig>>({});
 
-  const addQuestion = (columnIndex: number) => {
-    const newQuestion: ColumnQuestionConfig = {
+  const updateColumnConfig = (columnIndex: number, updates: Partial<ColumnQuestionConfig>) => {
+    const currentConfig = columnConfigs[columnIndex] || {
       questionType: 'miscellaneous',
       fullQuestionText: '',
       hasExistingCodeframe: false
     };
-
-    setQuestions(prev => ({
+    
+    const newConfig = { ...currentConfig, ...updates };
+    setColumnConfigs(prev => ({
       ...prev,
-      [columnIndex]: [...(prev[columnIndex] || []), newQuestion]
+      [columnIndex]: newConfig
     }));
+    
+    onColumnConfigUpdate(columnIndex, newConfig);
   };
 
-  const removeQuestion = (columnIndex: number, questionIndex: number) => {
-    setQuestions(prev => ({
-      ...prev,
-      [columnIndex]: prev[columnIndex]?.filter((_, i) => i !== questionIndex) || []
-    }));
+  const handleFileUpload = (columnIndex: number, file: File) => {
+    updateColumnConfig(columnIndex, { codeframeFile: file });
   };
 
-  const updateQuestion = (columnIndex: number, questionIndex: number, updates: Partial<ColumnQuestionConfig>) => {
-    setQuestions(prev => {
-      const columnQuestions = [...(prev[columnIndex] || [])];
-      columnQuestions[questionIndex] = {
-        ...columnQuestions[questionIndex],
-        ...updates
-      };
-      
-      return {
-        ...prev,
-        [columnIndex]: columnQuestions
-      };
-    });
-
-    // Update main config
-    const updatedQuestion = {
-      ...(questions[columnIndex]?.[questionIndex] || {}),
-      ...updates
+  const getColumnConfig = (columnIndex: number): ColumnQuestionConfig => {
+    return columnConfigs[columnIndex] || {
+      questionType: 'miscellaneous',
+      fullQuestionText: '',
+      hasExistingCodeframe: false
     };
-    onConfigUpdate(columnIndex, updatedQuestion);
   };
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Grid className="h-5 w-5" />
+          <Grid3X3 className="h-5 w-5" />
           Multi-Variable Question Matrix
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Column</TableHead>
-                <TableHead>Questions</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {selectedColumns.map(columnIndex => {
-                const column = columns.find(col => col.index === columnIndex);
-                const columnQuestions = questions[columnIndex] || [];
+      <CardContent className="space-y-6">
+        {selectedColumns.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">
+            Select columns in the previous step to configure question settings
+          </p>
+        ) : (
+          selectedColumns.map((columnIndex) => {
+            const column = fileColumns.find(col => col.index === columnIndex);
+            const config = getColumnConfig(columnIndex);
+            
+            if (!column) return null;
+            
+            return (
+              <div key={columnIndex} className="border rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">{column.name}</h3>
+                  <Badge variant="outline">Column {columnIndex + 1}</Badge>
+                </div>
                 
-                return (
-                  <TableRow key={columnIndex}>
-                    <TableCell>
-                      <div>
-                        <Badge variant="outline">{column?.name || `Column ${columnIndex + 1}`}</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-2">
-                        {columnQuestions.map((question, questionIndex) => (
-                          <div key={questionIndex} className="border rounded p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">Question {questionIndex + 1}</Label>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeQuestion(columnIndex, questionIndex)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            
-                            <Textarea
-                              placeholder="Enter full question text..."
-                              value={question.fullQuestionText}
-                              onChange={(e) => updateQuestion(columnIndex, questionIndex, {
-                                fullQuestionText: e.target.value
-                              })}
-                              className="text-xs"
-                              rows={2}
-                            />
-                            
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">Has Existing Codeframe</Label>
-                              <Switch
-                                checked={question.hasExistingCodeframe}
-                                onCheckedChange={(checked) => updateQuestion(columnIndex, questionIndex, {
-                                  hasExistingCodeframe: checked
-                                })}
-                              />
-                            </div>
-                            
-                            {question.hasExistingCodeframe && (
-                              <div className="space-y-2">
-                                <Label className="text-xs">Upload Codeframe</Label>
-                                <Input
-                                  type="file"
-                                  accept=".xlsx,.xls,.csv"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      updateQuestion(columnIndex, questionIndex, {
-                                        codeframeFile: file
-                                      });
-                                    }
-                                  }}
-                                  className="text-xs"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addQuestion(columnIndex)}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add Question
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Question Type</Label>
+                    <Select
+                      value={config.questionType}
+                      onValueChange={(value) => updateColumnConfig(columnIndex, { questionType: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="brand_awareness">Brand Awareness</SelectItem>
+                        <SelectItem value="brand_description">Brand Description</SelectItem>
+                        <SelectItem value="miscellaneous">Miscellaneous</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label>Has Existing Codeframe</Label>
+                    <Switch
+                      checked={config.hasExistingCodeframe}
+                      onCheckedChange={(checked) => updateColumnConfig(columnIndex, { hasExistingCodeframe: checked })}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Full Question Text</Label>
+                  <Textarea
+                    placeholder="Enter the complete question text as it appears in the survey..."
+                    value={config.fullQuestionText}
+                    onChange={(e) => updateColumnConfig(columnIndex, { fullQuestionText: e.target.value })}
+                    className="min-h-[80px]"
+                  />
+                </div>
+                
+                {config.hasExistingCodeframe && (
+                  <div className="space-y-2">
+                    <Label>Upload Existing Codeframe</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(columnIndex, file);
+                        }}
+                        className="flex-1"
+                      />
+                      <Button variant="outline" size="sm">
+                        <Upload className="h-4 w-4" />
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                    </div>
+                    {config.codeframeFile && (
+                      <p className="text-sm text-muted-foreground">
+                        Uploaded: {config.codeframeFile.name}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </CardContent>
     </Card>
   );

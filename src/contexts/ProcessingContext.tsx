@@ -37,6 +37,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   });
   const [isCodeframeFinalized, setIsCodeframeFinalized] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [columnQuestionConfigs, setColumnQuestionConfigs] = useState<Record<number, ColumnQuestionConfig>>({});
 
   const { isUploading, setIsUploading, parseExcelFile, parseCSVFile } = useFileParsing();
   const { 
@@ -140,6 +141,19 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     setColumnQuestionTypes(prev => ({
       ...prev,
       [columnIndex]: questionType as QuestionType
+    }));
+  };
+
+  const setColumnQuestionConfig = (columnIndex: number, config: ColumnQuestionConfig) => {
+    setColumnQuestionConfigs(prev => ({
+      ...prev,
+      [columnIndex]: config
+    }));
+    
+    // Also update the question type
+    setColumnQuestionTypes(prev => ({
+      ...prev,
+      [columnIndex]: config.questionType as QuestionType
     }));
   };
 
