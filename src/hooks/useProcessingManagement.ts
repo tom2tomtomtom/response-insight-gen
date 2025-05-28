@@ -56,6 +56,15 @@ export const useProcessingManagement = () => {
       return;
     }
 
+    if (!apiConfig?.apiKey) {
+      toast({
+        variant: "destructive",
+        title: "API Key Required",
+        description: "Please configure your OpenAI API key before processing",
+      });
+      return;
+    }
+
     if (selectedColumns.length === 0) {
       toast({
         variant: "destructive",
@@ -85,7 +94,7 @@ export const useProcessingManagement = () => {
       setApiSelectedColumns(selectedColumnsInfo);
       setApiColumnQuestionTypes(columnQuestionTypes);
       
-      const response = await processFile(uploadedFile.id, apiConfig || undefined);
+      const response = await processFile(uploadedFile.id, apiConfig);
       
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Processing failed to start');
@@ -102,7 +111,7 @@ export const useProcessingManagement = () => {
     }
   };
 
-  const pollForResults = async (fileId: string, apiConfig: ApiConfig | null, columnQuestionTypes: Record<number, QuestionType>) => {
+  const pollForResults = async (fileId: string, apiConfig: ApiConfig, columnQuestionTypes: Record<number, QuestionType>) => {
     try {
       setProcessingStatus('Analyzing responses by question type...');
       setProcessingProgress(30);
@@ -124,7 +133,7 @@ export const useProcessingManagement = () => {
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const response = await getProcessingResult(fileId, apiConfig || undefined);
+      const response = await getProcessingResult(fileId, apiConfig);
       
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to retrieve results');
@@ -139,16 +148,11 @@ export const useProcessingManagement = () => {
         console.log('Multiple codeframes set:', response.data.multipleCodeframes);
       }
       
-      // Generate demo insights if none provided
-      let finalInsights = response.data.insights;
-      if (!finalInsights) {
-        finalInsights = generateDemoInsights(response.data, columnQuestionTypes);
-        console.log('Generated demo insights:', finalInsights);
-      } else {
-        console.log('Using provided insights:', finalInsights);
+      // Use insights from API response
+      if (response.data.insights) {
+        setInsights(response.data.insights);
+        console.log('Using API insights:', response.data.insights);
       }
-      
-      setInsights(finalInsights);
       
       setProcessingProgress(100);
       setProcessingStatus('Analysis complete!');

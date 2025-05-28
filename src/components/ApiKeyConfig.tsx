@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from './ui/label';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from './ui/form';
 import { useForm } from 'react-hook-form';
-import { Key, CheckCircle2, ExternalLink, Info, AlertCircle } from 'lucide-react';
+import { Key, CheckCircle2, ExternalLink, Info, AlertTriangle } from 'lucide-react';
 import { toast } from './ui/use-toast';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -97,18 +97,18 @@ const ApiKeyConfig: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="h-5 w-5" />
-            Enter Your OpenAI API Key
+            OpenAI API Key Required
           </CardTitle>
           <CardDescription>
-            Configure your API key to process real text data with accurate analysis
+            Configure your API key to analyze your text data with AI-powered analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Alert variant="warning" className="mb-4">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
             <AlertTitle>API Key Required</AlertTitle>
             <AlertDescription>
-              You're currently in demo mode which uses mock data. To analyze your actual data, please enter your OpenAI API key below.
+              This tool requires an OpenAI API key to function. Please enter your API key below to continue with analysis.
             </AlertDescription>
           </Alert>
           
@@ -164,21 +164,19 @@ const ApiKeyConfig: React.FC = () => {
                 {isLoading ? "Verifying..." : "Save & Verify API Key"}
               </Button>
 
-              {!apiConfig?.isConfigured && (
-                <div className="text-center text-sm text-muted-foreground mt-2">
-                  <p>Don't have an API key?{' '}
-                    <a 
-                      href="https://platform.openai.com/account/api-keys" 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-primary inline-flex items-center hover:underline"
-                    >
-                      Get one from OpenAI
-                      <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </p>
-                </div>
-              )}
+              <div className="text-center text-sm text-muted-foreground mt-2">
+                <p>Don't have an API key?{' '}
+                  <a 
+                    href="https://platform.openai.com/account/api-keys" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="text-primary inline-flex items-center hover:underline"
+                  >
+                    Get one from OpenAI
+                    <ExternalLink className="ml-1 h-3 w-3" />
+                  </a>
+                </p>
+              </div>
             </form>
           </Form>
         </CardContent>
@@ -186,7 +184,7 @@ const ApiKeyConfig: React.FC = () => {
         {apiConfig?.isConfigured && (
           <CardFooter className="bg-green-50 dark:bg-green-950 flex gap-2 items-center">
             <CheckCircle2 className="text-green-600 h-5 w-5" />
-            <span className="text-sm text-green-600">API key configured successfully</span>
+            <span className="text-sm text-green-600">API key configured successfully - you can now analyze your data</span>
           </CardFooter>
         )}
       </Card>

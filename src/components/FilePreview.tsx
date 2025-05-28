@@ -1,24 +1,47 @@
+
 import React from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
-import { Button } from './ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
+import { Alert, AlertDescription } from './ui/alert';
+import { AlertTriangle } from 'lucide-react';
 import ColumnSelector from './ColumnSelector';
 
 const FilePreview: React.FC = () => {
-  const { uploadedFile, rawResponses, fileColumns } = useProcessing();
+  const { uploadedFile, rawResponses, fileColumns, apiConfig } = useProcessing();
   
   if (!uploadedFile) {
     return null;
   }
+
+  // Show API key requirement if not configured
+  if (!apiConfig?.isConfigured) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex justify-between items-center">
+            <span>File Uploaded: {uploadedFile.filename}</span>
+            <Badge variant="outline">{rawResponses.length} responses</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Please configure your OpenAI API key first to proceed with analysis. Scroll up to the "OpenAI API Key Required" section.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
   
-  // If we have file columns, use the column selector
+  // If we have file columns and API is configured, use the column selector
   if (fileColumns.length > 0) {
     return <ColumnSelector onContinueToAnalysis={() => {}} />;
   }
   
-  // Fallback to the old preview if no column data
+  // Fallback message
   return (
     <Card className="w-full">
       <CardHeader>
@@ -28,48 +51,11 @@ const FilePreview: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="table">
-          <TabsList className="mb-4 w-full md:w-auto">
-            <TabsTrigger value="table">Table View</TabsTrigger>
-            <TabsTrigger value="text">Text View</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="table">
-            <div className="overflow-x-auto">
-              <table className="excel-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Response</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rawResponses.slice(0, 8).map((response, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td>
-                      <td>{response}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              
-              <p className="text-muted-foreground text-sm mt-4">
-                Displaying {Math.min(8, rawResponses.length)} of {rawResponses.length} responses
-              </p>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="text">
-            <div className="space-y-2">
-              {rawResponses.slice(0, 8).map((response, index) => (
-                <div key={index} className="p-3 border rounded-md">
-                  <div className="text-xs text-muted-foreground mb-1">Response {index + 1}</div>
-                  <div>{response}</div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+        <Alert>
+          <AlertDescription>
+            File uploaded successfully. Please configure your API key to continue with analysis.
+          </AlertDescription>
+        </Alert>
       </CardContent>
     </Card>
   );

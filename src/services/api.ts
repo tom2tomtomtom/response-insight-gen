@@ -30,6 +30,10 @@ export const setColumnQuestionTypes = (columnTypes: Record<number, string>): voi
 
 // Test API connection with provided key
 export const testApiConnection = async (apiKey: string, apiUrl: string): Promise<boolean> => {
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error("API key is required");
+  }
+  
   try {
     // Make a minimal request to test the connection
     const response = await fetch(`${apiUrl || DEFAULT_API_URL}`, {
@@ -92,14 +96,12 @@ export const setUserResponses = (responses: string[]) => {
 
 // Process the uploaded file
 export const processFile = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<UploadedFile>> => {
+  if (!apiConfig?.apiKey) {
+    throw new Error('OpenAI API key is required for processing. Please configure your API key first.');
+  }
+  
   try {
-    if (!apiConfig?.apiKey) {
-      // For demo purposes, return a mock response if no API key is provided
-      return mockProcessFile(fileId);
-    }
-    
-    // Just return a processing status without actually making an API call
-    // The actual processing will happen in getProcessingResult
+    // Return a processing status - actual processing will happen in getProcessingResult
     return {
       success: true,
       data: {
@@ -115,21 +117,6 @@ export const processFile = async (fileId: string, apiConfig?: { apiKey: string, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
-};
-
-// Mock process function for demo purposes when no API key is provided
-const mockProcessFile = async (fileId: string): Promise<ApiResponse<UploadedFile>> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  return {
-    success: true,
-    data: {
-      id: fileId,
-      filename: 'responses.xlsx',
-      status: 'processing'
-    }
-  };
 };
 
 // Calculate code percentages based on usage
@@ -461,15 +448,13 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
   }
 };
 
-// Get the processing result with improved error handling
+// Get the processing result - now requires API key
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
+  if (!apiConfig?.apiKey) {
+    throw new Error('OpenAI API key is required for processing. Please configure your API key first.');
+  }
+  
   try {
-    // If no API key is provided, fall back to mock data
-    if (!apiConfig?.apiKey) {
-      console.log("No API key provided, using mock data");
-      return mockGetProcessingResult(fileId);
-    }
-    
     console.log("Selected columns for processing:", userSelectedColumns);
     
     // Check if we have selected columns
@@ -612,184 +597,6 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
-};
-
-// Mock processing result function for demo purposes when no API key is provided
-const mockGetProcessingResult = async (fileId: string): Promise<ApiResponse<ProcessedResult>> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Mock codeframe for demonstration
-  const mockCodeframe = [
-    {
-      code: "C01",
-      numeric: "1",
-      label: "Ease of Use",
-      definition: "Comments related to how easy or difficult the product is to use",
-      examples: ["Very intuitive interface", "Easy to navigate", "Straightforward to set up"],
-      count: 8,
-      percentage: 32
-    },
-    {
-      code: "C02",
-      numeric: "2",
-      label: "Performance",
-      definition: "Comments about the speed, reliability, or efficiency of the product",
-      examples: ["Runs smoothly", "No lag time", "Quick response"],
-      count: 6,
-      percentage: 24
-    },
-    {
-      code: "C03",
-      numeric: "3",
-      label: "Features",
-      definition: "Mentions of specific product features or functionality",
-      examples: ["Love the search capability", "The dashboard is comprehensive", "Export feature saves time"],
-      count: 5,
-      percentage: 20
-    },
-    {
-      code: "C04",
-      numeric: "4", 
-      label: "Value",
-      definition: "Comments about price, ROI, or overall value proposition",
-      examples: ["Worth every penny", "Good price for what you get", "Expensive but worth it"],
-      count: 4,
-      percentage: 16
-    },
-    {
-      code: "C05",
-      numeric: "5",
-      label: "Support",
-      definition: "Feedback about customer service or technical support",
-      examples: ["Support team was helpful", "Quick response to my questions", "Documentation is thorough"],
-      count: 2,
-      percentage: 8
-    },
-    {
-      code: "C06",
-      numeric: "6",
-      label: "Other",
-      definition: "Comments that don't fit into the above categories",
-      examples: ["Packaging was neat", "Arrived on time", "Company seems ethical"],
-      count: 0,
-      percentage: 0
-    }
-  ];
-
-  // Generate code summary
-  const codeSummary = mockCodeframe.map(code => ({
-    code: code.code,
-    numeric: code.numeric,
-    label: code.label,
-    count: code.count || 0,
-    percentage: code.percentage || 0
-  })).sort((a, b) => b.percentage - a.percentage);
-  
-  // Generate mock coded responses based on user-uploaded data
-  const generateMockCodedResponses = () => {
-    // If we have selected columns, use that data
-    if (userSelectedColumns.length > 0 && userUploadedResponses.length > 0) {
-      console.log("Generating mock results from user data");
-      
-      const result = [];
-      
-      // Use responses from each selected column
-      for (const column of userSelectedColumns) {
-        const examples = column.examples || [];
-        
-        // For each example in the column, create a coded response
-        for (let i = 0; i < examples.length && i < 5; i++) {
-          const responseText = examples[i];
-          
-          // Only include substantive responses
-          if (responseText && responseText.length > 5) {
-            // Randomly assign 1-2 codes
-            const numCodes = Math.floor(Math.random() * 2) + 1;
-            const allCodes = mockCodeframe.map(item => item.code);
-            const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
-            const codesAssigned = shuffledCodes.slice(0, numCodes);
-            
-            result.push({
-              responseText,
-              columnName: column.name,
-              columnIndex: column.index,
-              codesAssigned
-            });
-          }
-        }
-        
-        // If we have user uploaded responses, use some of those too
-        const columnResponses = userUploadedResponses.slice(0, 10);
-        for (let i = 0; i < columnResponses.length && i < 5; i++) {
-          const responseText = columnResponses[i];
-          
-          // Only include substantive responses
-          if (responseText && responseText.length > 5) {
-            // Randomly assign 1-2 codes
-            const numCodes = Math.floor(Math.random() * 2) + 1;
-            const allCodes = mockCodeframe.map(item => item.code);
-            const shuffledCodes = [...allCodes].sort(() => Math.random() - 0.5);
-            const codesAssigned = shuffledCodes.slice(0, numCodes);
-            
-            result.push({
-              responseText,
-              columnName: column.name,
-              columnIndex: column.index,
-              codesAssigned
-            });
-          }
-        }
-      }
-      
-      return result;
-    }
-    
-    // Fallback to default mock data
-    return [
-      {
-        responseText: "The interface is so intuitive, I was able to figure it out without reading any instructions.",
-        codesAssigned: ["C01"],
-        columnName: "Overall Comments",
-        columnIndex: 0
-      },
-      {
-        responseText: "Sometimes it runs slowly when processing large files, but overall it's been reliable.",
-        codesAssigned: ["C02"],
-        columnName: "Performance Feedback",
-        columnIndex: 1
-      },
-      {
-        responseText: "I love the export to Excel feature, it saves me hours every week. Well worth the price!",
-        codesAssigned: ["C03", "C04"],
-        columnName: "Feature Comments",
-        columnIndex: 2
-      },
-      {
-        responseText: "Customer support responded within minutes when I had a question. The dashboard is also great.",
-        codesAssigned: ["C05", "C03"],
-        columnName: "Support Experience",
-        columnIndex: 3
-      },
-      {
-        responseText: "Very easy to use and the price is reasonable for what you get.",
-        codesAssigned: ["C01", "C04"],
-        columnName: "Value Assessment",
-        columnIndex: 4
-      }
-    ];
-  };
-  
-  // Return mock results
-  return {
-    success: true,
-    data: {
-      codeframe: mockCodeframe,
-      codedResponses: generateMockCodedResponses(),
-      codeSummary: codeSummary,
-      status: 'complete'
-    }
-  };
 };
 
 // Function to generate an Excel file from the results with multiple codeframes
