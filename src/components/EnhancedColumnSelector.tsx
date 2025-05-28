@@ -33,7 +33,7 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
     setColumnQuestionConfig
   } = useProcessing();
   
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(true); // Default to open to show features
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(true);
   
   if (!uploadedFile || fileColumns.length === 0) {
     return null;
@@ -127,36 +127,39 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
         />
       </Card>
 
-      {/* Enhanced Configuration Section - Always visible when columns are selected */}
+      {/* Enhanced Configuration Section - Make it more prominent and always show when there are selected columns */}
       {selectedColumns.length > 0 && (
-        <Card className="w-full">
-          <CardHeader>
-            <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-              <CollapsibleTrigger asChild>
-                <Button variant="outline" className="w-full flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    Enhanced Configuration & Question Setup
+        <div className="space-y-6">
+          {/* Multi-Variable Question Matrix - Always visible when columns selected */}
+          <MultiVariableQuestionMatrix
+            selectedColumns={selectedColumns}
+            onConfigurationChange={handleQuestionConfigChange}
+          />
+          
+          {/* Additional Advanced Controls */}
+          <Card className="w-full">
+            <CardHeader>
+              <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="w-full flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Advanced Controls & Settings
+                    </div>
+                    {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-6 mt-6">
+                  {/* Sample & Brand Controls */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <SampleThresholdControl />
+                    <BrandListManager />
                   </div>
-                  {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-6 mt-6">
-                {/* Multi-Variable Question Matrix */}
-                <MultiVariableQuestionMatrix
-                  selectedColumns={selectedColumns}
-                  onConfigurationChange={handleQuestionConfigChange}
-                />
-                
-                {/* Sample & Brand Controls */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <SampleThresholdControl />
-                  <BrandListManager />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </CardHeader>
-        </Card>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardHeader>
+          </Card>
+        </div>
       )}
     </div>
   );
