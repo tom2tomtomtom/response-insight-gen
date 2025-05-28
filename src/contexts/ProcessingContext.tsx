@@ -52,7 +52,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     startProcessing: handleStartProcessing,
     downloadResults,
     refineCodeframe,
-    setProcessingStatus
+    setProcessingStatus,
+    downloadMoniglewCSV: handleDownloadMoniglewCSV
   } = useProcessingManagement();
 
   const handleFileUpload = async (file: File) => {
@@ -378,7 +379,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     saveChanges,
     reprocessWithAI,
     applyToFullDataset,
-    downloadBinaryMatrix
+    downloadBinaryMatrix,
+    downloadMoniglewCSV: handleDownloadMoniglewCSV
   };
 
   return (
