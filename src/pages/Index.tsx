@@ -8,7 +8,12 @@ import ColumnSelector from '../components/ColumnSelector';
 import { useProcessing } from '../contexts/ProcessingContext';
 
 const Index: React.FC = () => {
-  const { apiConfig, uploadedFile, fileColumns } = useProcessing();
+  const { apiConfig, uploadedFile, fileColumns, startProcessing } = useProcessing();
+
+  const handleContinueToAnalysis = async () => {
+    console.log('Starting analysis...');
+    await startProcessing();
+  };
 
   return (
     <Layout>
@@ -30,10 +35,7 @@ const Index: React.FC = () => {
         {/* Column Selection Section - show after file is uploaded */}
         {apiConfig?.isConfigured && uploadedFile && fileColumns && fileColumns.length > 0 && (
           <div className="w-full max-w-6xl mx-auto">
-            <ColumnSelector onContinueToAnalysis={() => {
-              // This will be handled by the ColumnSelector component itself
-              console.log('Continuing to analysis...');
-            }} />
+            <ColumnSelector onContinueToAnalysis={handleContinueToAnalysis} />
           </div>
         )}
       </div>
