@@ -5,11 +5,11 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ArrowRight, FileText, FileCode } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { CodeframeData } from '../types';
+import { UploadedCodeframe } from '../types';
 
 interface ColumnSelectionSummaryProps {
   selectedCount: number;
-  activeCodeframe: CodeframeData | null;
+  activeCodeframe: UploadedCodeframe | null;
   onContinueToAnalysis: () => void;
 }
 

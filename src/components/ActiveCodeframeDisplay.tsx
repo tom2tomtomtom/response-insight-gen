@@ -2,10 +2,10 @@
 import React from 'react';
 import { Badge } from './ui/badge';
 import { FileCode } from 'lucide-react';
-import { CodeframeData } from '../types';
+import { UploadedCodeframe } from '../types';
 
 interface ActiveCodeframeDisplayProps {
-  activeCodeframe: CodeframeData;
+  activeCodeframe: UploadedCodeframe;
 }
 
 const ActiveCodeframeDisplay: React.FC<ActiveCodeframeDisplayProps> = ({ activeCodeframe }) => {
