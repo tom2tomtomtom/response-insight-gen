@@ -335,7 +335,133 @@ const generateInsightsPrompt = (questionTypes: string[], codedResponses: any, co
   Format your response as markdown text with clear section headers for each question type.`;
 };
 
-// Get the processing result with multiple codeframes
+// Helper function to safely parse JSON with better error handling
+const safeParseJSON = (jsonString: string, questionType: string) => {
+  try {
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error(`JSON parsing failed for question type ${questionType}:`, error);
+    
+    // Try to extract partial JSON if the response was truncated
+    if (jsonString.includes('"codeframe"') && jsonString.includes('"codedResponses"')) {
+      try {
+        // Find the last complete JSON object
+        let lastValidIndex = -1;
+        let braceCount = 0;
+        
+        for (let i = 0; i < jsonString.length; i++) {
+          if (jsonString[i] === '{') braceCount++;
+          if (jsonString[i] === '}') {
+            braceCount--;
+            if (braceCount === 0) {
+              lastValidIndex = i;
+            }
+          }
+        }
+        
+        if (lastValidIndex > 0) {
+          const truncatedJson = jsonString.substring(0, lastValidIndex + 1);
+          return JSON.parse(truncatedJson);
+        }
+      } catch (recoveryError) {
+        console.error(`JSON recovery failed for question type ${questionType}:`, recoveryError);
+      }
+    }
+    
+    throw new Error(`Invalid JSON response for ${questionType}. The AI response may have been truncated or malformed.`);
+  }
+};
+
+// Enhanced error handling for individual question type processing
+const processQuestionTypeWithRetry = async (questionType: string, columns: any[], apiConfig: any, retryCount = 0) => {
+  const MAX_RETRIES = 2;
+  
+  try {
+    const promptContent = generatePromptByQuestionType(questionType, columns, userUploadedCodeframe);
+    
+    const messages = [
+      {
+        role: "system",
+        content: `You are an expert qualitative researcher analyzing ${questionType} type survey responses. IMPORTANT: Always return valid JSON with proper syntax.`
+      },
+      {
+        role: "user",
+        content: promptContent
+      }
+    ];
+    
+    // Reduce max_tokens on retry to avoid truncation
+    const maxTokens = retryCount > 0 ? 2000 : 4000;
+    
+    const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiConfig.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: maxTokens,
+        response_format: { type: "json_object" }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || errorData.message || `API request failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    
+    // Use safe JSON parsing
+    const parsedResult = safeParseJSON(content, questionType);
+    
+    // Validate the parsed result structure
+    if (!parsedResult.codeframe || !Array.isArray(parsedResult.codeframe) || 
+        !parsedResult.codedResponses || !Array.isArray(parsedResult.codedResponses)) {
+      throw new Error(`Invalid response structure for ${questionType}. Missing required fields.`);
+    }
+    
+    // Ensure codeframe has numeric codes
+    const codeframeWithNumeric = ensureNumericCodes(parsedResult.codeframe);
+    
+    // Ensure "Other" category exists
+    const codeframeWithOther = ensureOtherCategory(codeframeWithNumeric);
+    
+    // Calculate code percentages
+    const { updatedCodeframe, codeSummary } = calculateCodePercentages(
+      parsedResult.codedResponses, 
+      codeframeWithOther
+    );
+    
+    // Return the processed result for this question type
+    return {
+      questionType,
+      codeframe: updatedCodeframe,
+      codedResponses: parsedResult.codedResponses,
+      codeSummary: codeSummary,
+      brandHierarchies: parsedResult.brandHierarchies,
+      attributeThemes: parsedResult.attributeThemes
+    };
+    
+  } catch (error) {
+    console.error(`Error processing question type ${questionType} (attempt ${retryCount + 1}):`, error);
+    
+    // Retry with reduced complexity if possible
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Retrying ${questionType} with reduced complexity...`);
+      return processQuestionTypeWithRetry(questionType, columns, apiConfig, retryCount + 1);
+    }
+    
+    // If all retries failed, return a fallback or throw with helpful message
+    throw new Error(`Failed to process ${questionType} after ${MAX_RETRIES + 1} attempts. ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+
+// Get the processing result with improved error handling
 export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
   try {
     // If no API key is provided, fall back to mock data
@@ -361,12 +487,11 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         columnsByType[questionType] = [];
       }
       
-      // Get all responses for this column, not just examples
       const columnData = {
         name: columnInfo.name,
         index: columnInfo.index,
         responses: columnInfo.examples || [],
-        settings: columnInfo.settings || {} // Include any settings like hasNets
+        settings: columnInfo.settings || {}
       };
       
       columnsByType[questionType].push(columnData);
@@ -374,110 +499,46 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     
     console.log("Columns grouped by question type:", Object.keys(columnsByType));
     
-    // Process each question type separately
-    const promises = Object.entries(columnsByType).map(async ([questionType, columns]) => {
-      // Create a prompt for this question type
-      const promptContent = generatePromptByQuestionType(questionType, columns, userUploadedCodeframe);
-      
-      const messages = [
-        {
-          role: "system",
-          content: `You are an expert qualitative researcher analyzing ${questionType} type survey responses.`
-        },
-        {
-          role: "user",
-          content: promptContent
-        }
-      ];
-      
-      // Make the API call to OpenAI
-      const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiConfig.apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: messages,
-          temperature: 0.7,
-          max_tokens: 4000,
-          response_format: { type: "json_object" }
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || errorData.message || `Processing failed with status ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
+    // Process each question type with enhanced error handling
+    const results = [];
+    const failedTypes = [];
+    
+    for (const [questionType, columns] of Object.entries(columnsByType)) {
       try {
-        // Parse the content from the OpenAI response
-        const content = data.choices[0].message.content;
-        let parsedResult;
-        
-        try {
-          parsedResult = JSON.parse(content);
-        } catch (jsonError) {
-          console.error("Failed to parse JSON for question type", questionType, jsonError);
-          return null;
-        }
-        
-        // Validate the parsed result structure
-        if (!parsedResult.codeframe || !Array.isArray(parsedResult.codeframe) || 
-            !parsedResult.codedResponses || !Array.isArray(parsedResult.codedResponses)) {
-          console.warn("OpenAI response doesn't have the expected structure for question type", questionType);
-          return null;
-        }
-        
-        // Ensure codeframe has numeric codes
-        const codeframeWithNumeric = ensureNumericCodes(parsedResult.codeframe);
-        
-        // Ensure "Other" category exists
-        const codeframeWithOther = ensureOtherCategory(codeframeWithNumeric);
-        
-        // Calculate code percentages
-        const { updatedCodeframe, codeSummary } = calculateCodePercentages(
-          parsedResult.codedResponses, 
-          codeframeWithOther
-        );
-        
-        // Return the processed result for this question type
-        return {
-          questionType,
-          codeframe: updatedCodeframe,
-          codedResponses: parsedResult.codedResponses,
-          codeSummary: codeSummary,
-          // Include special data if available
-          brandHierarchies: parsedResult.brandHierarchies,
-          attributeThemes: parsedResult.attributeThemes
-        };
+        console.log(`Processing question type: ${questionType}`);
+        const result = await processQuestionTypeWithRetry(questionType, columns, apiConfig);
+        results.push(result);
+        console.log(`Successfully processed ${questionType}`);
       } catch (error) {
-        console.error("Error handling OpenAI response for question type", questionType, error);
-        return null;
+        console.error(`Failed to process question type ${questionType}:`, error);
+        failedTypes.push({
+          questionType,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
-    });
-    
-    // Wait for all question types to be processed
-    const results = (await Promise.all(promises)).filter(Boolean);
-    
-    if (results.length === 0) {
-      throw new Error("Failed to process any question types");
     }
     
-    // Combine results from all question types
+    // Check if we have any successful results
+    if (results.length === 0) {
+      const errorMessages = failedTypes.map(f => `${f.questionType}: ${f.error}`).join('; ');
+      throw new Error(`Failed to process any question types. Errors: ${errorMessages}`);
+    }
+    
+    // Show warning if some types failed but others succeeded
+    if (failedTypes.length > 0) {
+      console.warn(`Some question types failed to process:`, failedTypes);
+      // You could show a toast notification here for partial success
+    }
+    
+    // Combine results from successful question types
     const allCodedResponses: any[] = [];
     const multipleCodeframes: Record<string, any> = {};
     
     results.forEach(result => {
       if (!result) return;
       
-      // Add these coded responses to the combined list
       allCodedResponses.push(...result.codedResponses);
       
-      // Store the codeframe and summary by question type
       multipleCodeframes[result.questionType] = {
         codeframe: result.codeframe,
         codeSummary: result.codeSummary,
@@ -493,7 +554,6 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     let insights = null;
     if (results.length > 1) {
       try {
-        // Generate insights across question types
         const insightsPrompt = generateInsightsPrompt(
           Object.keys(multipleCodeframes),
           allCodedResponses,
@@ -537,11 +597,9 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     return {
       success: true,
       data: {
-        // Primary codeframe and responses for backward compatibility
         codeframe: primaryResult.codeframe,
         codedResponses: allCodedResponses,
         codeSummary: primaryResult.codeSummary,
-        // New multi-codeframe structure
         multipleCodeframes,
         insights,
         status: 'complete'
