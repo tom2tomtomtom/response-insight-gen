@@ -116,7 +116,12 @@ export const useProcessingManagement = () => {
       setProcessingStatus('Mapping responses to codes...');
       setProcessingProgress(80);
       
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setProcessingStatus('Generating insights...');
+      setProcessingProgress(90);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const response = await getProcessingResult(fileId, apiConfig || undefined);
       
@@ -124,15 +129,25 @@ export const useProcessingManagement = () => {
         throw new Error(response.error || 'Failed to retrieve results');
       }
       
+      console.log('Processing response received:', response.data);
+      
       setResults(response.data);
       
       if (response.data.multipleCodeframes) {
         setMultipleCodeframes(response.data.multipleCodeframes);
+        console.log('Multiple codeframes set:', response.data.multipleCodeframes);
       }
       
-      if (response.data.insights) {
-        setInsights(response.data.insights);
+      // Generate demo insights if none provided
+      let finalInsights = response.data.insights;
+      if (!finalInsights) {
+        finalInsights = generateDemoInsights(response.data, columnQuestionTypes);
+        console.log('Generated demo insights:', finalInsights);
+      } else {
+        console.log('Using provided insights:', finalInsights);
       }
+      
+      setInsights(finalInsights);
       
       setProcessingProgress(100);
       setProcessingStatus('Analysis complete!');
@@ -150,6 +165,54 @@ export const useProcessingManagement = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const generateDemoInsights = (results: ProcessedResult, columnQuestionTypes: Record<number, QuestionType>): string => {
+    const totalResponses = results.codedResponses.length;
+    const totalCodes = results.codeframe.length;
+    const questionTypeCount = Object.keys(columnQuestionTypes).length;
+    
+    // Get most common codes
+    const codeFrequency: Record<string, number> = {};
+    results.codedResponses.forEach(response => {
+      response.codesAssigned.forEach(code => {
+        codeFrequency[code] = (codeFrequency[code] || 0) + 1;
+      });
+    });
+    
+    const topCodes = Object.entries(codeFrequency)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3)
+      .map(([code, count]) => ({ code, count, percentage: Math.round((count / totalResponses) * 100) }));
+    
+    let insights = `Analysis Summary\n\n`;
+    insights += `Your analysis processed ${totalResponses} responses across ${questionTypeCount} question type${questionTypeCount > 1 ? 's' : ''}, generating ${totalCodes} distinct codes.\n\n`;
+    
+    if (topCodes.length > 0) {
+      insights += `Key Findings:\n`;
+      topCodes.forEach((item, index) => {
+        const codeInfo = results.codeframe.find(c => c.code === item.code);
+        const codeName = codeInfo?.name || item.code;
+        insights += `${index + 1}. ${codeName}: Mentioned in ${item.percentage}% of responses (${item.count} mentions)\n`;
+      });
+      insights += `\n`;
+    }
+    
+    // Add question type specific insights
+    if (questionTypeCount > 1) {
+      const questionTypes = Object.values(columnQuestionTypes);
+      const uniqueTypes = [...new Set(questionTypes)];
+      insights += `Question Types Analyzed:\n`;
+      uniqueTypes.forEach(type => {
+        const count = questionTypes.filter(t => t === type).length;
+        insights += `- ${type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${count} question${count > 1 ? 's' : ''}\n`;
+      });
+      insights += `\n`;
+    }
+    
+    insights += `The analysis revealed patterns in response themes and sentiment. Consider reviewing the detailed codeframe and coded responses for deeper insights into participant feedback.`;
+    
+    return insights;
   };
 
   const downloadResults = async () => {
