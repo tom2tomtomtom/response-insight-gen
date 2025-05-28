@@ -192,6 +192,50 @@ export const useProcessingManagement = () => {
     }
   };
 
+  const downloadMoniglewCSV = async () => {
+    if (!results) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No results available to download",
+      });
+      return;
+    }
+
+    try {
+      setIsGeneratingExcel(true);
+      setProcessingStatus('Generating Moniglew-style CSV...');
+      
+      // Use the new formatter
+      const { MoniglewStyleFormatter } = await import('../utils/moniglewStyleFormatter');
+      const formatter = new MoniglewStyleFormatter(results);
+      const csv = formatter.generateCSV();
+      
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'moniglew_style_output.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Moniglew CSV Downloaded",
+        description: "Your industry-standard CSV file has been generated",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "CSV Generation Failed",
+        description: error instanceof Error ? error.message : "An error occurred while generating the CSV file",
+      });
+    } finally {
+      setIsGeneratingExcel(false);
+    }
+  };
+
   const refineCodeframe = async (codeframe: CodeframeEntry[]) => {
     if (!results) return;
     
@@ -234,6 +278,7 @@ export const useProcessingManagement = () => {
     setResults,
     setMultipleCodeframes,
     setInsights,
-    setProcessingStatus
+    setProcessingStatus,
+    downloadMoniglewCSV
   };
 };
