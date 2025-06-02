@@ -9,7 +9,7 @@ import { getColumnNames, analyzeColumns } from './useColumnAnalysis';
 export const useFileParsing = () => {
   const [isUploading, setIsUploading] = useState(false);
 
-  const parseExcelFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[], rawData: any[][] }> => {
+  const parseExcelFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[], rawData: any[][], columnDataWithIndices: Array<{value: any, rowIndex: number}[]> }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       
@@ -87,14 +87,15 @@ export const useFileParsing = () => {
             columnCount
           );
           
-          const { columnInfos, textResponses } = analyzeColumns(columns, columnNames);
+          const { columnInfos, textResponses, columnDataWithIndices } = analyzeColumns(columns, columnNames);
           
           debugLog(`Found ${columnInfos.length} columns, but none automatically selected`);
           
           resolve({ 
             columns: columnInfos,
             responses: textResponses,
-            rawData
+            rawData,
+            columnDataWithIndices
           });
         } catch (error) {
           console.error("Excel parsing error:", error);
@@ -110,7 +111,7 @@ export const useFileParsing = () => {
     });
   };
 
-  const parseCSVFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[], rawData: any[][] }> => {
+  const parseCSVFile = async (file: File): Promise<{ columns: ColumnInfo[], responses: string[], rawData: any[][], columnDataWithIndices: Array<{value: any, rowIndex: number}[]> }> => {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
         header: false,
@@ -166,14 +167,15 @@ export const useFileParsing = () => {
               columnCount
             );
             
-            const { columnInfos, textResponses } = analyzeColumns(columns, columnNames);
+            const { columnInfos, textResponses, columnDataWithIndices } = analyzeColumns(columns, columnNames);
             
             debugLog(`Found ${columnInfos.length} columns, but none automatically selected`);
             
             resolve({ 
               columns: columnInfos,
               responses: textResponses,
-              rawData
+              rawData,
+              columnDataWithIndices
             });
           } catch (error) {
             console.error("CSV parsing error:", error);

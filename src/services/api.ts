@@ -250,8 +250,22 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
   
   // If user uploaded a codeframe, include it in the prompt
   if (uploadedCodeframe) {
-    promptContent = `I have a survey with the following open-ended questions and responses:
-    ${JSON.stringify(columns, null, 2)}
+    // Transform columns to include row indices
+    const columnsWithIndices = columns.map(col => ({
+      ...col,
+      responsesWithRowIndices: col.responsesWithIndices?.filter(item => 
+        item.value !== undefined && 
+        item.value !== null && 
+        item.value !== '' &&
+        String(item.value).trim().length > 5
+      ).map(item => ({
+        responseText: String(item.value),
+        rowIndex: item.rowIndex
+      })) || []
+    }));
+    
+    promptContent = `I have a survey with the following open-ended questions and responses (each response includes its row index):
+    ${JSON.stringify(columnsWithIndices, null, 2)}
     
     I already have a predefined codeframe that I want you to use to code these responses:
     ${JSON.stringify(uploadedCodeframe.entries, null, 2)}
@@ -260,10 +274,11 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
     1. Use ONLY the provided codeframe codes - do not create new ones
     2. Assign the appropriate codes to each response based on the definitions in the codeframe
     3. Make sure to include the "Other" category for responses that don't fit any category
+    4. IMPORTANT: Preserve the rowIndex for each response in your output
     
     Format your response as a JSON object with two properties:
     - codeframe: The provided codeframe array of code objects with {code, numeric, label, definition, examples}
-    - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
+    - codedResponses: An array of response objects with {responseText, columnName, columnIndex, rowIndex, codesAssigned}`;
     
     return promptContent;
   }
@@ -271,7 +286,7 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
   // Create different prompts based on question type
   switch (questionType) {
     case 'brand_awareness':
-      promptContent = `I have survey responses from Unaided Brand Awareness questions where respondents listed brands they are aware of:
+      promptContent = `I have survey responses from Unaided Brand Awareness questions where respondents listed brands they are aware of (each response includes its row index):
       ${JSON.stringify(columns, null, 2)}
       
       Please analyze these responses and:
@@ -284,15 +299,16 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
          - A numeric code
          - Sample mentions that would be coded to this brand
       5. If you detect brand hierarchies, create parent codes (e.g., "Hospital System") and child codes (individual hospitals)
+      6. IMPORTANT: Preserve the rowIndex from responsesWithRowIndices for each response in your output
       
       Format your response as a JSON object with:
       - codeframe: Array of code objects with {code, numeric, label, definition, examples, parentCode}
-      - codedResponses: Array of response objects with {responseText, columnName, columnIndex, codesAssigned}
+      - codedResponses: Array of response objects with {responseText, columnName, columnIndex, rowIndex, codesAssigned}
       - brandHierarchies: Object mapping parent codes to arrays of child codes`;
       break;
       
     case 'brand_description':
-      promptContent = `I have survey responses from Brand Description questions where respondents described brands:
+      promptContent = `I have survey responses from Brand Description questions where respondents described brands (each response includes its row index):
       ${JSON.stringify(columns, null, 2)}
       
       Please analyze these responses and:
@@ -305,16 +321,17 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
          - A numeric code
          - Example phrases from the responses
       5. Group related attributes under themes where possible
+      6. IMPORTANT: Preserve the rowIndex from responsesWithRowIndices for each response in your output
       
       Format your response as a JSON object with:
       - codeframe: Array of code objects with {code, numeric, label, definition, examples, themeGroup}
-      - codedResponses: Array of objects with {responseText, columnName, columnIndex, codesAssigned}
+      - codedResponses: Array of objects with {responseText, columnName, columnIndex, rowIndex, codesAssigned}
       - attributeThemes: Object mapping themes to arrays of attribute codes`;
       break;
       
     case 'miscellaneous':
     default:
-      promptContent = `I have a survey with the following open-ended questions and responses:
+      promptContent = `I have a survey with the following open-ended questions and responses (each response includes its row index):
       ${JSON.stringify(columns, null, 2)}
       
       Please analyze these responses and:
@@ -326,10 +343,11 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
          - A numeric code (e.g., 1, 2, 3 or 1.1, 1.2, etc.)
          - 2-3 example phrases
       4. Assign appropriate codes to each response
+      5. IMPORTANT: Preserve the rowIndex from responsesWithRowIndices for each response in your output
       
       Format your response as a JSON object with two properties:
       - codeframe: An array of code objects with {code, numeric, label, definition, examples}
-      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, codesAssigned}`;
+      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, rowIndex, codesAssigned}`;
   }
   
   return promptContent;
@@ -390,14 +408,48 @@ const safeParseJSON = (jsonString: string, questionType: string) => {
 // Enhanced error handling for individual question type processing
 const processQuestionTypeWithRetry = async (questionType: string, columns: any[], apiConfig: any, retryCount = 0) => {
   const MAX_RETRIES = 2;
+  const MAX_RESPONSES_PER_BATCH = 50; // Limit responses to prevent token overflow
   
   try {
-    const promptContent = generatePromptByQuestionType(questionType, columns, userUploadedCodeframe);
+    // Transform columns to include row indices and sample if needed
+    const processedColumns = columns.map(col => {
+      // Get responses with row indices
+      const responsesWithIndices = col.responsesWithIndices?.filter(item => 
+        item.value !== undefined && 
+        item.value !== null && 
+        item.value !== '' &&
+        String(item.value).trim().length > 5
+      ) || [];
+      
+      // Sample if too many responses
+      let sampledResponsesWithIndices = responsesWithIndices;
+      if (responsesWithIndices.length > MAX_RESPONSES_PER_BATCH) {
+        console.log(`Sampling ${MAX_RESPONSES_PER_BATCH} responses from ${responsesWithIndices.length} for column ${col.name}`);
+        const step = Math.floor(responsesWithIndices.length / MAX_RESPONSES_PER_BATCH);
+        sampledResponsesWithIndices = [];
+        for (let i = 0; i < responsesWithIndices.length; i += step) {
+          if (sampledResponsesWithIndices.length < MAX_RESPONSES_PER_BATCH) {
+            sampledResponsesWithIndices.push(responsesWithIndices[i]);
+          }
+        }
+      }
+      
+      return { 
+        ...col, 
+        responsesWithRowIndices: sampledResponsesWithIndices.map(item => ({
+          responseText: String(item.value),
+          rowIndex: item.rowIndex
+        })),
+        totalResponses: responsesWithIndices.length 
+      };
+    });
+    
+    const promptContent = generatePromptByQuestionType(questionType, processedColumns, userUploadedCodeframe);
     
     const messages = [
       {
         role: "system",
-        content: `You are an expert qualitative researcher analyzing ${questionType} type survey responses. IMPORTANT: Always return valid JSON with proper syntax.`
+        content: `You are an expert qualitative researcher analyzing ${questionType} type survey responses. IMPORTANT: Always return valid JSON with proper syntax. Note: You are seeing a sample of responses - create a comprehensive codeframe that would work for the full dataset. Each response in responsesWithRowIndices includes a rowIndex that MUST be preserved in your codedResponses output.`
       },
       {
         role: "user",
@@ -406,7 +458,7 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
     ];
     
     // Reduce max_tokens on retry to avoid truncation
-    const maxTokens = retryCount > 0 ? 2000 : 4000;
+    const maxTokens = retryCount > 0 ? 2000 : 3000;
     
     const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
       method: 'POST',
@@ -504,6 +556,7 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         name: columnInfo.name,
         index: columnInfo.index,
         responses: columnInfo.examples || [],
+        responsesWithIndices: columnInfo.dataWithIndices || [],
         settings: columnInfo.settings || {}
       };
       
@@ -792,6 +845,7 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
     console.log("Adding coded responses worksheet...");
     try {
       const responsesData = result.codedResponses.map(response => ({
+        'Respondent ID': response.rowIndex !== undefined ? response.rowIndex + 1 : 'N/A',
         Response: response.responseText,
         Column: response.columnName || 'Unknown',
         QuestionType: hasMultipleCodeframes ? 
@@ -852,6 +906,7 @@ export const generateExcelFile = async (result: ProcessedResult): Promise<Blob> 
           }).join('; ');
           
           columnResponses.get(key)?.push({
+            'Respondent ID': response.rowIndex !== undefined ? response.rowIndex + 1 : 'N/A',
             Response: response.responseText,
             QuestionType: hasMultipleCodeframes ? 
               (questionType === 'brand_awareness' ? 'Brand Awareness' : 
@@ -934,6 +989,7 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
     
     // Step 5: Create the Coded Responses worksheet - medium sized data
     const responsesData = result.codedResponses.map(response => ({
+      'Respondent ID': response.rowIndex !== undefined ? response.rowIndex + 1 : 'N/A',
       Response: response.responseText,
       Column: response.columnName || 'Unknown',
       Codes: response.codesAssigned.join('; '),
@@ -985,8 +1041,9 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
       const MAX_ROWS = 50000; // Limit to prevent memory issues
       const CHUNK_SIZE = 1000; // Process chunks of rows at a time
       
-      // Get headers first
-      const headers = Array.isArray(rawFileData[0]) ? [...rawFileData[0], "Assigned Codes", "Code Labels"] : ["Assigned Codes", "Code Labels"];
+      // Get headers first - add Respondent ID as first column
+      const originalHeaders = Array.isArray(rawFileData[0]) ? rawFileData[0] : [];
+      const headers = ["Respondent ID", ...originalHeaders, "Assigned Codes", "Code Labels"];
       const headerSheet = XLSX.utils.aoa_to_sheet([headers]);
       XLSX.utils.book_append_sheet(workbook, headerSheet, "Original Data with Codes");
       
@@ -1006,8 +1063,9 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
           const row = rawFileData[i];
           if (!Array.isArray(row)) continue;
           
-          // Create a new row with assignment info
-          const newRow = [...row]; // Shallow copy is sufficient here
+          // Create a new row with respondent ID and assignment info
+          const respondentId = i; // Row index is the respondent ID (0-based, header is row 0)
+          const newRow = [respondentId, ...row]; // Add respondent ID as first column
           let foundMatch = false;
           
           // Try to find a coded response match in this row

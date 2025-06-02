@@ -27,6 +27,7 @@ export interface CodedResponse {
   codesAssigned: string[];
   columnName?: string; // Add column name to preserve context
   columnIndex?: number; // Add column index for reference
+  rowIndex?: number; // Add row index for respondent ID
 }
 
 export interface CodeSummary {
@@ -92,6 +93,7 @@ export interface ColumnInfo {
   examples: string[]; // Example values (first few values)
   stats: ColumnStats; // Statistics about the column
   settings?: ColumnSetting; // Add settings property
+  dataWithIndices?: Array<{value: any, rowIndex: number}>; // Column data with row indices
 }
 
 export interface ColumnSetting {

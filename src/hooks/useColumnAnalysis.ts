@@ -100,9 +100,10 @@ export const getColumnNames = (
 export const analyzeColumns = (
   columns: any[][], 
   columnNames: string[]
-): { columnInfos: ColumnInfo[], textResponses: string[] } => {
+): { columnInfos: ColumnInfo[], textResponses: string[], columnDataWithIndices: Array<{value: any, rowIndex: number}[]> } => {
   const columnInfos: ColumnInfo[] = [];
   const textResponses: string[] = [];
+  const columnDataWithIndices: Array<{value: any, rowIndex: number}[]> = [];
   
   columns.forEach((columnData, index) => {
     const { type, stats } = analyzeColumnValues(columnData);
@@ -119,18 +120,26 @@ export const analyzeColumns = (
       );
     }
     
-    // Get non-empty examples
-    const examples = columnData
-      .filter((value: any) => value !== undefined && value !== null && value !== '')
-      .slice(0, 5)
-      .map(String);
+    // Get non-empty examples with row indices
+    const examplesWithIndices = columnData
+      .map((value: any, rowIndex: number) => ({ value, rowIndex }))
+      .filter(({ value }) => value !== undefined && value !== null && value !== '')
+      .slice(0, 5);
+    
+    const examples = examplesWithIndices.map(({ value }) => String(value));
+    
+    // Store column data with row indices
+    columnDataWithIndices.push(
+      columnData.map((value: any, rowIndex: number) => ({ value, rowIndex }))
+    );
       
     columnInfos.push({
       index,
       name: columnNames[index],
       type: columnNameSuggestsOpenEnded && examples.length > 0 ? 'text' : type,
       examples,
-      stats
+      stats,
+      dataWithIndices: columnDataWithIndices[index]
     });
     
     // Collect text responses from text columns for backward compatibility
@@ -148,5 +157,5 @@ export const analyzeColumns = (
     }
   });
   
-  return { columnInfos, textResponses };
+  return { columnInfos, textResponses, columnDataWithIndices };
 };

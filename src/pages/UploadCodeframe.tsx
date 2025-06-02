@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -13,6 +14,7 @@ import { toast } from '../components/ui/use-toast';
 
 const UploadCodeframe: React.FC = () => {
   const { saveUploadedCodeframe } = useProcessing();
+  const navigate = useNavigate();
   const [codeframeName, setCodeframeName] = useState('');
   const [uploadedCodeframe, setUploadedCodeframe] = useState<CodeframeEntry[] | null>(null);
   
@@ -123,6 +125,38 @@ const UploadCodeframe: React.FC = () => {
     reader.readAsArrayBuffer(file);
   };
   
+  const handleDownloadTemplate = () => {
+    // Create sample data for the template
+    const templateData = [
+      { Code: 'A1', Numeric: '1', Label: 'Quality', Definition: 'Mentions of product or service quality' },
+      { Code: 'A2', Numeric: '2', Label: 'Value', Definition: 'References to price, cost, or value for money' },
+      { Code: 'A3', Numeric: '3', Label: 'Service', Definition: 'Customer service experiences or interactions' },
+      { Code: 'A4', Numeric: '4', Label: 'Innovation', Definition: 'New features, technology, or creative solutions' },
+      { Code: 'A5', Numeric: '5', Label: 'Other', Definition: 'Responses that do not fit other categories' }
+    ];
+    
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Codeframe Template');
+    
+    // Add column widths for better readability
+    ws['!cols'] = [
+      { wch: 10 }, // Code
+      { wch: 10 }, // Numeric
+      { wch: 20 }, // Label
+      { wch: 50 }  // Definition
+    ];
+    
+    // Generate and download file
+    XLSX.writeFile(wb, 'codeframe_template.xlsx');
+    
+    toast({
+      title: "Template downloaded",
+      description: "Use this template to structure your codeframe for upload",
+    });
+  };
+
   const handleSaveCodeframe = () => {
     if (!uploadedCodeframe || !codeframeName) {
       toast({
@@ -143,6 +177,11 @@ const UploadCodeframe: React.FC = () => {
         title: "Codeframe saved",
         description: "The codeframe is now available for use in your analysis",
       });
+      
+      // Navigate back to main workflow after a short delay
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
     }
   };
   
@@ -239,7 +278,7 @@ const UploadCodeframe: React.FC = () => {
             )}
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleDownloadTemplate}>
               <FileSpreadsheet className="h-4 w-4 mr-2" /> 
               Download Template
             </Button>

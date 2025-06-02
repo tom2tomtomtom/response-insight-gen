@@ -7,6 +7,16 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { 
   Edit3, 
   Lock, 
@@ -34,12 +44,24 @@ const RevisionSystem: React.FC = () => {
   } = useProcessing();
 
   const [revisionInstructions, setRevisionInstructions] = useState('');
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [showApplyDialog, setShowApplyDialog] = useState(false);
 
   const handleReprocessWithRevisions = async () => {
     if (!revisionInstructions.trim()) return;
     
     await reprocessWithAI();
     setRevisionInstructions('');
+  };
+
+  const handleFinalize = () => {
+    finalizeCodeframe();
+    setShowFinalizeDialog(false);
+  };
+
+  const handleApplyToFullDataset = () => {
+    applyToFullDataset();
+    setShowApplyDialog(false);
   };
 
   if (!results) return null;
@@ -123,7 +145,7 @@ const RevisionSystem: React.FC = () => {
               </Button>
               
               <Button
-                onClick={finalizeCodeframe}
+                onClick={() => setShowFinalizeDialog(true)}
                 disabled={hasUnsavedChanges}
                 className="flex-1"
               >
@@ -154,7 +176,7 @@ const RevisionSystem: React.FC = () => {
               </Button>
               
               <Button
-                onClick={applyToFullDataset}
+                onClick={() => setShowApplyDialog(true)}
                 className="flex-1"
               >
                 <Database className="h-4 w-4 mr-2" />
@@ -171,6 +193,54 @@ const RevisionSystem: React.FC = () => {
           </p>
         </div>
       </CardContent>
+      
+      {/* Finalize Dialog */}
+      <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalize Codeframe?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Once finalized:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>The codeframe will be locked and cannot be edited</li>
+                <li>You can apply it to the full dataset</li>
+                <li>You'll need to unlock it to make any changes</li>
+              </ul>
+              <p className="pt-2">Are you sure you want to finalize this codeframe?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFinalize}>
+              Finalize Codeframe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Apply to Full Dataset Dialog */}
+      <AlertDialog open={showApplyDialog} onOpenChange={setShowApplyDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apply to Full Dataset?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>This will:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Apply the finalized codeframe to all responses in your dataset</li>
+                <li>Process responses that weren't included in the initial sample</li>
+                <li>May take several minutes depending on dataset size</li>
+              </ul>
+              <p className="pt-2">Do you want to proceed with full dataset coding?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleApplyToFullDataset}>
+              Apply to Full Dataset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
