@@ -344,22 +344,88 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     });
   };
 
-  const reprocessWithAI = async () => {
-    if (!results) return;
+  const reprocessWithAI = async (revisionInstructions?: string) => {
+    if (!results || !apiConfig?.apiKey) return;
     
     try {
-      setProcessingStatus('Reprocessing with AI...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      setProcessingStatus('Reprocessing with AI incorporating your edits...');
+      
+      // Create a prompt that includes the current codeframe and revision instructions
+      const reprocessPrompt = `I have an existing codeframe with manual edits. Please reprocess the responses using this updated codeframe.
+      
+      Current Codeframe (with manual edits):
+      ${JSON.stringify(results.codeframe, null, 2)}
+      
+      ${revisionInstructions ? `Revision Instructions: ${revisionInstructions}` : 'Apply the manual edits shown in the codeframe above.'}
+      
+      Original Responses to recode:
+      ${JSON.stringify(results.codedResponses.map(r => ({
+        responseText: r.responseText,
+        columnName: r.columnName,
+        rowIndex: r.rowIndex
+      })), null, 2)}
+      
+      Please:
+      1. Use the updated codeframe structure exactly as provided
+      2. Recode all responses according to the new codeframe
+      3. Ensure all responses are assigned appropriate codes
+      4. Return the same JSON structure with updated codesAssigned arrays`;
+      
+      const response = await fetch(`${apiConfig.apiUrl || "https://api.openai.com/v1/chat/completions"}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiConfig.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert qualitative researcher. Apply the provided codeframe to recode responses, following any manual edits or revision instructions exactly."
+            },
+            {
+              role: "user",
+              content: reprocessPrompt
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 3000,
+          response_format: { type: "json_object" }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const reprocessedData = JSON.parse(data.choices[0].message.content);
+      
+      // Update results with reprocessed data
+      const updatedResults = {
+        ...results,
+        codedResponses: reprocessedData.codedResponses || results.codedResponses,
+        codeframe: results.codeframe // Keep the manually edited codeframe
+      };
+      
+      // Use refineCodeframe to update the results
+      refineCodeframe(updatedResults);
+      
+      setProcessingStatus('');
+      setHasUnsavedChanges(false);
       
       toast({
         title: "Reprocessing Complete",
-        description: "AI has incorporated your manual edits into the codeframe."
+        description: "AI has recoded all responses using your edited codeframe."
       });
     } catch (error) {
+      console.error('Reprocessing error:', error);
+      setProcessingStatus('');
       toast({
         variant: "destructive",
         title: "Reprocessing Failed",
-        description: "An error occurred during reprocessing."
+        description: error instanceof Error ? error.message : "An error occurred during reprocessing."
       });
     }
   };

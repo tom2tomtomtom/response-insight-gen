@@ -50,7 +50,7 @@ const RevisionSystem: React.FC = () => {
   const handleReprocessWithRevisions = async () => {
     if (!revisionInstructions.trim()) return;
     
-    await reprocessWithAI();
+    await reprocessWithAI(revisionInstructions);
     setRevisionInstructions('');
   };
 

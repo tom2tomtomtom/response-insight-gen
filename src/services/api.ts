@@ -191,29 +191,63 @@ const ensureNumericCodes = (codeframe: any[]) => {
   });
 };
 
-// Make sure "Other" category exists in the codeframe
-const ensureOtherCategory = (codeframe: any[]) => {
-  // Check if Other category already exists
-  const otherExists = codeframe.some(code => 
-    code.code === "Other" || 
-    code.label === "Other" || 
-    code.label.toLowerCase().includes("other")
-  );
+// Ensure essential catch-all categories exist in the codeframe
+const ensureCatchAllCategories = (codeframe: any[], questionType: string) => {
+  const requiredCategories = [
+    {
+      code: "Other",
+      label: "Other",
+      definition: "Responses that don't fit into the main categories",
+      examples: ["Miscellaneous response", "Unrelated comment", "Different answer"]
+    },
+    {
+      code: "None",
+      label: "None/Nothing",
+      definition: "Responses indicating nothing, none, or no answer",
+      examples: ["None", "Nothing", "N/A", "No response"]
+    },
+    {
+      code: "DK_NA",
+      label: "Don't Know/Not Applicable",
+      definition: "Responses indicating uncertainty or that the question doesn't apply",
+      examples: ["Don't know", "Not sure", "N/A", "Not applicable", "Can't say"]
+    }
+  ];
   
-  if (otherExists) {
-    return codeframe;
-  }
+  let updatedCodeframe = [...codeframe];
   
-  // Add an "Other" category
-  return [...codeframe, {
-    code: "Other",
-    numeric: codeframe.length + 1,
-    label: "Other responses",
-    definition: "Responses that don't fit into the main categories",
-    examples: ["Miscellaneous response", "Unrelated comment"],
-    count: 0,
-    percentage: 0
-  }];
+  // Get the highest numeric code
+  let maxNumeric = 0;
+  codeframe.forEach(code => {
+    const numeric = parseInt(code.numeric || '0');
+    if (!isNaN(numeric) && numeric > maxNumeric) {
+      maxNumeric = numeric;
+    }
+  });
+  
+  requiredCategories.forEach(required => {
+    // Check if this category already exists
+    const exists = codeframe.some(code => 
+      code.code === required.code || 
+      code.label.toLowerCase() === required.label.toLowerCase() ||
+      (required.label.includes('/') && 
+        required.label.split('/').some(part => 
+          code.label.toLowerCase().includes(part.toLowerCase().trim())
+        ))
+    );
+    
+    if (!exists) {
+      maxNumeric++;
+      updatedCodeframe.push({
+        ...required,
+        numeric: maxNumeric.toString(),
+        count: 0,
+        percentage: 0
+      });
+    }
+  });
+  
+  return updatedCodeframe;
 };
 
 // Helper function to create unique worksheet names
@@ -292,7 +326,10 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
       Please analyze these responses and:
       1. Create a codeframe with distinct brand codes
       2. Group related brands under parent systems/categories where appropriate
-      3. Include an "Other" category for mentions that don't fit main brands
+      3. REQUIRED: Include these catch-all categories:
+         - "Other" for mentions that don't fit main brands
+         - "None/Nothing" for no brand mentions
+         - "Don't Know/Not Applicable" for uncertain responses
       4. For each code, provide:
          - A short label (the brand name)
          - A clear definition including parent company if applicable
@@ -314,7 +351,10 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
       Please analyze these responses and:
       1. Create a codeframe with attribute categories (like Quality, Value, Innovation)
       2. Include sentiment dimensions (Positive, Negative, Neutral) where appropriate
-      3. Always include an "Other" category
+      3. REQUIRED: Include these catch-all categories:
+         - "Other" for attributes that don't fit main categories
+         - "None/Nothing" for no description given
+         - "Don't Know/Not Applicable" for uncertain responses
       4. For each code, provide:
          - A short label for the attribute
          - A clear definition of what this attribute represents
@@ -336,7 +376,10 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
       
       Please analyze these responses and:
       1. Create a codeframe with 5-10 distinct codes using numeric identifiers
-      2. Always include an "Other" category for responses that don't clearly fit other categories
+      2. REQUIRED: Always include these three catch-all categories:
+         - "Other" for responses that don't fit main categories
+         - "None/Nothing" for responses indicating nothing or no answer
+         - "Don't Know/Not Applicable" for uncertain or N/A responses
       3. For each code, provide:
          - A short label
          - A clear definition
@@ -511,13 +554,13 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
     // Ensure codeframe has numeric codes
     const codeframeWithNumeric = ensureNumericCodes(parsedResult.codeframe);
     
-    // Ensure "Other" category exists
-    const codeframeWithOther = ensureOtherCategory(codeframeWithNumeric);
+    // Ensure all catch-all categories exist
+    const codeframeWithCatchAll = ensureCatchAllCategories(codeframeWithNumeric, questionType);
     
     // Calculate code percentages
     const { updatedCodeframe, codeSummary } = calculateCodePercentages(
       parsedResult.codedResponses, 
-      codeframeWithOther
+      codeframeWithCatchAll
     );
     
     // Return the processed result for this question type
