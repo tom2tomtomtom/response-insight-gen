@@ -5,6 +5,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { useProcessing } from '../contexts/ProcessingContext';
 import ColumnSearchControls from './ColumnSearchControls';
 import ColumnCard from './ColumnCard';
@@ -14,6 +15,10 @@ import ActiveCodeframeDisplay from './ActiveCodeframeDisplay';
 import MultiVariableQuestionMatrix from './MultiVariableQuestionMatrix';
 import SampleThresholdControl from './SampleThresholdControl';
 import BrandListManager from './BrandListManager';
+import CodeframeCountDisplay from './CodeframeCountDisplay';
+import TrackingStudyVersionManager from './TrackingStudyVersionManager';
+import BrandHierarchyManager from './BrandHierarchyManager';
+import QuestionGroupingAutomationComponent from './QuestionGroupingAutomation';
 
 interface EnhancedColumnSelectorProps {
   onContinueToAnalysis: () => void;
@@ -124,6 +129,12 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
       {/* Enhanced Configuration Section - Make it more prominent and always show when there are selected columns */}
       {selectedColumns.length > 0 && (
         <div className="space-y-6">
+          {/* Codeframe Count Display */}
+          <CodeframeCountDisplay />
+          
+          {/* Question Grouping Automation */}
+          <QuestionGroupingAutomationComponent />
+          
           {/* Multi-Variable Question Matrix - Always visible when columns selected */}
           <MultiVariableQuestionMatrix
             selectedColumns={selectedColumns}
@@ -143,12 +154,30 @@ const EnhancedColumnSelector: React.FC<EnhancedColumnSelectorProps> = ({ onConti
                     {isAdvancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-6 mt-6">
-                  {/* Sample & Brand Controls */}
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <SampleThresholdControl />
-                    <BrandListManager />
-                  </div>
+                <CollapsibleContent className="mt-6">
+                  <Tabs defaultValue="general" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="general">General</TabsTrigger>
+                      <TabsTrigger value="tracking">Tracking Study</TabsTrigger>
+                      <TabsTrigger value="brand">Brand Hierarchy</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="general" className="space-y-6 mt-4">
+                      {/* Sample & Brand Controls */}
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <SampleThresholdControl />
+                        <BrandListManager />
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="tracking" className="mt-4">
+                      <TrackingStudyVersionManager />
+                    </TabsContent>
+                    
+                    <TabsContent value="brand" className="mt-4">
+                      <BrandHierarchyManager />
+                    </TabsContent>
+                  </Tabs>
                 </CollapsibleContent>
               </Collapsible>
             </CardHeader>

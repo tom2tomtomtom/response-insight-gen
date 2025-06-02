@@ -59,4 +59,6 @@ export interface ProcessingContextType {
   downloadBinaryMatrix: () => void;
   downloadMoniglewCSV: () => Promise<void>;
   saveBrandList: (brands: BrandEntry[]) => void;
+  saveProjectRecord: (processingResults: ProcessedResult | null, status?: 'complete' | 'partial' | 'failed') => void;
+  getProjectRecords: () => any[]; // Returns ProjectRecord[]
 }

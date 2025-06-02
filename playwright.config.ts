@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: 'html',
   
   use: {
-    baseURL: 'http://localhost:8081',
+    baseURL: 'http://localhost:8082',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -25,7 +25,7 @@ export default defineConfig({
 
   webServer: {
     command: 'npm run dev',
-    port: 8081,
+    port: 8082,
     reuseExistingServer: true,
   },
 });

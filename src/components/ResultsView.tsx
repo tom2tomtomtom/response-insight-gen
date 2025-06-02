@@ -21,6 +21,7 @@ import BinaryCodedMatrix from './BinaryCodedMatrix';
 import PartialResultsRecovery from './PartialResultsRecovery';
 import FinalizeCodeframe from './FinalizeCodeframe';
 import CodeframeRefinement from './CodeframeRefinement';
+import RevisionSystem from './RevisionSystem';
 
 const ResultsView: React.FC = () => {
   const { 
@@ -37,7 +38,9 @@ const ResultsView: React.FC = () => {
     isRefinementMode,
     toggleRefinementMode,
     refineCodeframe,
-    isCodeframeFinalized
+    isCodeframeFinalized,
+    downloadMoniglewCSV,
+    selectedColumns
   } = useProcessing();
   
   const [searchFilter, setSearchFilter] = useState('');
@@ -138,6 +141,23 @@ const ResultsView: React.FC = () => {
       });
     }
   };
+
+  const handleMoniglewDownload = async () => {
+    try {
+      await downloadMoniglewCSV(selectedColumns, fileColumns);
+    } catch (error) {
+      console.error("Moniglew export failed:", error);
+      
+      toast({
+        variant: "destructive",
+        title: "Moniglew Export Failed",
+        description: error instanceof Error 
+          ? error.message 
+          : "There was an error generating the Moniglew CSV file.",
+        duration: 10000,
+      });
+    }
+  };
   
   return (
     <div className="w-full space-y-4">
@@ -207,6 +227,9 @@ const ResultsView: React.FC = () => {
         {currentCodeSummary && currentCodeSummary.length > 0 && (
           <CodeSummaryChart codeSummary={currentCodeSummary} />
         )}
+        
+        {/* Revision System for codeframe editing and reprocessing */}
+        <RevisionSystem />
         
         {/* Finalize Codeframe Component */}
         <FinalizeCodeframe 
@@ -347,23 +370,35 @@ const ResultsView: React.FC = () => {
           <span>Start New Analysis</span>
         </Button>
         
-        <Button 
-          onClick={handleExport}
-          disabled={isGeneratingExcel}
-          className="space-x-2 w-full md:w-auto"
-        >
-          {isGeneratingExcel ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Generating...</span>
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              <span>Download Excel</span>
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleExport}
+            disabled={isGeneratingExcel}
+            className="space-x-2"
+          >
+            {isGeneratingExcel ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                <span>Download Excel</span>
+              </>
+            )}
+          </Button>
+          
+          <Button 
+            onClick={handleMoniglewDownload}
+            disabled={isGeneratingExcel}
+            variant="secondary"
+            className="space-x-2"
+          >
+            <Download className="h-4 w-4" />
+            <span>Download Moniglew CSV</span>
+          </Button>
+        </div>
       </CardFooter>
     </Card>
     </div>

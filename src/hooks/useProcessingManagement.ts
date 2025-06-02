@@ -12,7 +12,11 @@ import {
 } from '../services/api';
 import { QuestionType } from '../contexts/types';
 
-export const useProcessingManagement = () => {
+export interface ProcessingManagementProps {
+  saveProjectRecord?: (processingResults: ProcessedResult | null, status?: 'complete' | 'partial' | 'failed') => void;
+}
+
+export const useProcessingManagement = (props?: ProcessingManagementProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
   const [processingProgress, setProcessingProgress] = useState(0);
@@ -178,11 +182,21 @@ export const useProcessingManagement = () => {
             });
           }, 1000);
         }
+        
+        // Save project record with partial status
+        if (props?.saveProjectRecord) {
+          props.saveProjectRecord(response.data, 'partial');
+        }
       } else {
         toast({
           title: "Analysis Complete",
           description: `Successfully analyzed ${response.data.codedResponses.length} responses across ${Object.keys(columnQuestionTypes).length || 1} question types`,
         });
+        
+        // Save project record with complete status
+        if (props?.saveProjectRecord) {
+          props.saveProjectRecord(response.data, 'complete');
+        }
       }
     } catch (error) {
       toast({
@@ -190,6 +204,11 @@ export const useProcessingManagement = () => {
         title: "Processing Error",
         description: error instanceof Error ? error.message : "An error occurred while retrieving results",
       });
+      
+      // Save project record with failed status
+      if (props?.saveProjectRecord) {
+        props.saveProjectRecord(null, 'failed');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -284,7 +303,7 @@ export const useProcessingManagement = () => {
     }
   };
 
-  const downloadMoniglewCSV = async () => {
+  const downloadMoniglewCSV = async (selectedColumns: number[], fileColumns: any[]) => {
     if (!results) {
       toast({
         variant: "destructive",
@@ -298,10 +317,12 @@ export const useProcessingManagement = () => {
       setIsGeneratingExcel(true);
       setProcessingStatus('Generating Monigle-style CSV...');
       
-      // Use the new formatter
-      const { MonigleStyleFormatter } = await import('../utils/monigleStyleFormatter');
-      const formatter = new MonigleStyleFormatter(results);
-      const csv = formatter.generateCSV();
+      // Use the improved Moniglew formatter
+      const { MoniglewFormatter } = await import('../utils/moniglewFormat');
+      const csv = MoniglewFormatter.generateMoniglewCSV(results, selectedColumns.map(idx => ({
+        name: fileColumns[idx]?.name || `Column_${idx}`,
+        index: idx
+      })));
       
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);

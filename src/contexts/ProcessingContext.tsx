@@ -19,8 +19,28 @@ const STORAGE_KEYS = {
   API_CONFIG: 'response-insight-api-config',
   COMPLETE_STATE: 'response-insight-complete-state',
   SELECTED_COLUMNS: 'response-insight-selected-columns',
-  COLUMN_CONFIGS: 'response-insight-column-configs'
+  COLUMN_CONFIGS: 'response-insight-column-configs',
+  PROJECT_RECORDS: 'response-insight-project-records'
 };
+
+// Project record interface
+export interface ProjectRecord {
+  id: string;
+  createdAt: string;
+  completedAt: string;
+  projectContext: ProjectContext;
+  metadata: {
+    fileName: string;
+    totalColumns: number;
+    columnsProcessed: number;
+    responsesAnalyzed: number;
+    codesGenerated: number;
+    questionTypes: string[];
+    trackingConfig?: TrackingStudyConfig;
+    codeframeRules?: CodeframeGenerationRules;
+  };
+  status: 'complete' | 'partial' | 'failed';
+}
 
 export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
@@ -156,6 +176,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
   }, [columnQuestionConfigs]);
 
   const { isUploading, setIsUploading, parseExcelFile, parseCSVFile } = useFileParsing();
+  
+  // Create a ref to hold the saveProjectRecord function
+  const saveProjectRecordRef = React.useRef<typeof saveProjectRecord | null>(null);
+  
   const { 
     isProcessing, 
     processingStatus, 
@@ -170,7 +194,13 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     refineCodeframe,
     setProcessingStatus,
     downloadMoniglewCSV: handleDownloadMoniglewCSV
-  } = useProcessingManagement();
+  } = useProcessingManagement({
+    saveProjectRecord: (processingResults, status) => {
+      if (saveProjectRecordRef.current) {
+        saveProjectRecordRef.current(processingResults, status);
+      }
+    }
+  });
 
   const handleFileUpload = async (file: File) => {
     try {
@@ -590,6 +620,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         title: "Full Dataset Processed",
         description: `Successfully applied codeframe to ${processedResponses.length} responses from ${allResponses.length} total responses.`
       });
+      
+      // Save project record for full dataset processing
+      saveProjectRecord(updatedResults, 'complete');
     } catch (error) {
       console.error('Full dataset application error:', error);
       setProcessingStatus('');
@@ -600,6 +633,71 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       });
     }
   };
+
+  const getProjectRecords = (): ProjectRecord[] => {
+    try {
+      const existingRecords = localStorage.getItem(STORAGE_KEYS.PROJECT_RECORDS);
+      return existingRecords ? JSON.parse(existingRecords) : [];
+    } catch (error) {
+      console.error('Error retrieving project records:', error);
+      return [];
+    }
+  };
+
+  const saveProjectRecord = (processingResults: ProcessedResult | null, status: 'complete' | 'partial' | 'failed' = 'complete') => {
+    if (!projectContext || !uploadedFile) {
+      console.warn('Cannot save project record: missing project context or uploaded file');
+      return;
+    }
+
+    try {
+      // Get existing project records
+      const existingRecords = localStorage.getItem(STORAGE_KEYS.PROJECT_RECORDS);
+      const records: ProjectRecord[] = existingRecords ? JSON.parse(existingRecords) : [];
+
+      // Calculate statistics
+      const responsesAnalyzed = processingResults?.codedResponses.length || 0;
+      const codesGenerated = processingResults?.codeframe.length || 0;
+      const questionTypes = Object.values(columnQuestionTypes).filter((v, i, a) => a.indexOf(v) === i);
+
+      // Create new project record
+      const newRecord: ProjectRecord = {
+        id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(uploadedFile.uploadedAt || Date.now()).toISOString(),
+        completedAt: new Date().toISOString(),
+        projectContext,
+        metadata: {
+          fileName: uploadedFile.filename,
+          totalColumns: fileColumns.length,
+          columnsProcessed: selectedColumns.length,
+          responsesAnalyzed,
+          codesGenerated,
+          questionTypes,
+          trackingConfig: trackingConfig,
+          codeframeRules: codeframeRules
+        },
+        status: status
+      };
+
+      // Add to records (keep last 50 records)
+      records.unshift(newRecord);
+      const trimmedRecords = records.slice(0, 50);
+
+      // Save to localStorage
+      localStorage.setItem(STORAGE_KEYS.PROJECT_RECORDS, JSON.stringify(trimmedRecords));
+
+      debugLog('Project record saved:', newRecord);
+      
+      return newRecord;
+    } catch (error) {
+      console.error('Error saving project record:', error);
+    }
+  };
+
+  // Update the ref after the function is defined
+  React.useEffect(() => {
+    saveProjectRecordRef.current = saveProjectRecord;
+  }, [projectContext, uploadedFile, fileColumns, selectedColumns, columnQuestionTypes, trackingConfig, codeframeRules]);
 
   const downloadBinaryMatrix = () => {
     if (!results) return;
@@ -695,7 +793,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     applyToFullDataset,
     downloadBinaryMatrix,
     saveBrandList,
-    downloadMoniglewCSV: handleDownloadMoniglewCSV
+    downloadMoniglewCSV: handleDownloadMoniglewCSV,
+    saveProjectRecord,
+    getProjectRecords
   };
 
   return (

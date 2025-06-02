@@ -8,6 +8,7 @@ import ApiConfig from './pages/ApiConfig';
 import NotFound from './pages/NotFound';
 import UploadCodeframe from './pages/UploadCodeframe';
 import Dashboard from './pages/Dashboard';
+import ProjectDashboard from './pages/ProjectDashboard';
 import './App.css';
 import './styles/excel-table.css';
 
@@ -18,6 +19,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/projects" element={<ProjectDashboard />} />
           <Route path="/api-config" element={<ApiConfig />} />
           <Route path="/upload-codeframe" element={<UploadCodeframe />} />
           <Route path="/404" element={<NotFound />} />

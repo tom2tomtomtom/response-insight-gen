@@ -10,6 +10,7 @@ import EnhancedColumnSelector from '../components/EnhancedColumnSelector';
 import EnhancedProcessingStatus from '../components/EnhancedProcessingStatus';
 import ResultsView from '../components/ResultsView';
 import StudySummaryPanel from '../components/StudySummaryPanel';
+import ProjectMetadataDisplay from '../components/ProjectMetadataDisplay';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Settings, Upload, BarChart3, FileText, Key } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -109,6 +110,8 @@ const Index: React.FC = () => {
 
           <TabsContent value="setup" className="space-y-6">
             <div className="w-full max-w-4xl mx-auto space-y-6">
+              <ProjectMetadataDisplay />
+              
               {!uploadedFile && (
                 <FileUploader />
               )}

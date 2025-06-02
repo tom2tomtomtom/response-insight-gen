@@ -1,23 +1,24 @@
 import { test, expect } from '@playwright/test';
 import * as path from 'path';
 
-// Test credentials
-const TEST_CREDENTIALS = {
-  email: 'tomh@redbaez.con',
-  password: 'Wijlre2010',
-  apiKey: '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',
-  testFile: 'patourism_segmentation_final_data 2(A1).csv'
+// Test data
+const TEST_DATA = {
+  apiKey: 'sk-test-key-12345', // Use a test key or set via environment variable
+  testCsvContent: `Question1,Question2,Question3
+"What brands come to mind?","How would you describe Brand X?","Any suggestions?"
+"Coca-Cola, Pepsi","Good quality","Improve packaging"
+"Nike, Adidas","Innovative","Better prices"`
 };
 
 test.describe('Response Insight Gen - Full Functionality Test', () => {
   test.beforeEach(async ({ page }) => {
     // Clear localStorage before each test
-    await page.goto('http://localhost:8081/');
+    await page.goto('/');
     await page.evaluate(() => localStorage.clear());
   });
 
   test('1. API Configuration', async ({ page }) => {
-    await page.goto('http://localhost:8081/');
+    await page.goto('/');
     
     // Should redirect to API config if not configured
     await expect(page).toHaveURL(/.*api-config/);

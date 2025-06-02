@@ -3,7 +3,7 @@ import React from 'react';
 import AiSky from './AiSky';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Button } from './ui/button';
-import { Settings2, FileCode, Home, Key, LayoutDashboard } from 'lucide-react';
+import { Settings2, FileCode, Home, Key, LayoutDashboard, FolderOpen } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
@@ -42,6 +42,16 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">Alpha Version</span>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="flex items-center gap-2" 
+              onClick={() => navigate('/projects')}
+            >
+              <FolderOpen className="h-4 w-4" />
+              Projects
+            </Button>
             
             <Button 
               variant="ghost" 
