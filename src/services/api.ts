@@ -454,19 +454,75 @@ const safeParseJSON = (jsonString: string, questionType: string) => {
 // Enhanced error handling for individual question type processing
 const processQuestionTypeWithRetry = async (questionType: string, columns: any[], apiConfig: any, retryCount = 0) => {
   const MAX_RETRIES = 3;
-  const MAX_RESPONSES_PER_BATCH = 25; // Can handle more since we filter out non-text
-  const MAX_COLUMNS_PER_REQUEST = 10; // Process all selected columns
+  const MAX_RESPONSES_PER_BATCH = 10; // Reduce to 10 responses per column
+  const MAX_COLUMNS_PER_REQUEST = 3; // Max 3 columns at a time
   
   try {
-    // Limit columns if there are too many
-    let columnsToProcess = columns;
-    if (columns.length > MAX_COLUMNS_PER_REQUEST) {
-      console.log(`Processing only first ${MAX_COLUMNS_PER_REQUEST} columns out of ${columns.length} to prevent token overflow`);
-      columnsToProcess = columns.slice(0, MAX_COLUMNS_PER_REQUEST);
+    // For single chunk processing (when columns <= MAX_COLUMNS_PER_REQUEST)
+    if (columns.length <= MAX_COLUMNS_PER_REQUEST) {
+      return await processSingleChunk(questionType, columns, apiConfig, retryCount);
     }
     
+    // For multiple chunks - process in batches and combine results
+    console.log(`Processing ${columns.length} columns in chunks of ${MAX_COLUMNS_PER_REQUEST}`);
+    const allCodedResponses = [];
+    let combinedCodeframe = [];
+    
+    for (let i = 0; i < columns.length; i += MAX_COLUMNS_PER_REQUEST) {
+      const columnChunk = columns.slice(i, i + MAX_COLUMNS_PER_REQUEST);
+      console.log(`Processing chunk ${Math.floor(i/MAX_COLUMNS_PER_REQUEST) + 1}: columns ${i + 1}-${Math.min(i + MAX_COLUMNS_PER_REQUEST, columns.length)}`);
+      
+      if (i > 0) {
+        console.log('Waiting 5 seconds between chunks...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+      
+      const chunkResult = await processSingleChunk(questionType, columnChunk, apiConfig, retryCount);
+      allCodedResponses.push(...chunkResult.codedResponses);
+      
+      // Merge codeframes intelligently
+      chunkResult.codeframe.forEach(code => {
+        if (!combinedCodeframe.some(c => c.code === code.code)) {
+          combinedCodeframe.push(code);
+        }
+      });
+    }
+    
+    return {
+      questionType,
+      codeframe: combinedCodeframe,
+      codedResponses: allCodedResponses,
+      codeSummary: calculateCodePercentages(allCodedResponses, combinedCodeframe)
+    };
+  } catch (error) {
+    if (retryCount < MAX_RETRIES) {
+      console.error(`Error processing question type ${questionType} (attempt ${retryCount + 1}):`, error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+        const waitTime = parseRetryAfter(errorMessage);
+        console.log(`Rate limit hit for ${questionType}. Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        console.log(`Retrying ${questionType} with reduced complexity...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      return processQuestionTypeWithRetry(questionType, columns, apiConfig, retryCount + 1);
+    }
+    
+    throw new Error(`Failed to process ${questionType} after ${retryCount + 1} attempts. ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+// Process a single chunk of columns
+const processSingleChunk = async (questionType: string, columns: any[], apiConfig: any, retryCount: number) => {
+  const MAX_RESPONSES_PER_BATCH = 10;
+  const MAX_RETRIES = 3;
+  
+  try {
     // Transform columns to include row indices and sample if needed
-    const processedColumns = columnsToProcess.map(col => {
+    const processedColumns = columns.map(col => {
       // Get responses with row indices - ONLY text responses, filter out numbers/codes
       const responsesWithIndices = col.responsesWithIndices?.filter(item => {
         if (!item.value) return false;
@@ -550,10 +606,8 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
         // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, waitTime));
         
-        // Force a retry for rate limit errors
-        if (retryCount < MAX_RETRIES) {
-          return processQuestionTypeWithRetry(questionType, columns, apiConfig, retryCount + 1);
-        }
+        // Force a retry for rate limit errors - but this is already handled by parent function
+        throw new Error(`Rate limit error: ${errorMessage}`);
       }
       
       throw new Error(errorMessage);
@@ -594,18 +648,8 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
     };
     
   } catch (error) {
-    console.error(`Error processing question type ${questionType} (attempt ${retryCount + 1}):`, error);
-    
-    // Retry with reduced complexity if possible
-    if (retryCount < MAX_RETRIES && !error.message.includes('after ' + (MAX_RETRIES + 1) + ' attempts')) {
-      console.log(`Retrying ${questionType} with reduced complexity...`);
-      // Add a small delay between retries
-      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-      return processQuestionTypeWithRetry(questionType, columns, apiConfig, retryCount + 1);
-    }
-    
-    // If all retries failed, return a fallback or throw with helpful message
-    throw new Error(`Failed to process ${questionType} after ${retryCount + 1} attempts. ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(`Error processing chunk for ${questionType} (attempt ${retryCount + 1}):`, error);
+    throw error; // Let the parent function handle retries
   }
 };
 
