@@ -353,28 +353,15 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
       break;
       
     case 'brand_description':
-      promptContent = `I have survey responses from Brand Description questions where respondents described brands (each response includes its row index):
+      promptContent = `Brand descriptions (with rowIndex):
       ${JSON.stringify(columns, null, 2)}
       
-      Please analyze these responses and:
-      1. Create a codeframe with attribute categories (like Quality, Value, Innovation)
-      2. Include sentiment dimensions (Positive, Negative, Neutral) where appropriate
-      3. REQUIRED: Include these catch-all categories:
-         - "Other" for attributes that don't fit main categories
-         - "None/Nothing" for no description given
-         - "Don't Know/Not Applicable" for uncertain responses
-      4. For each code, provide:
-         - A short label for the attribute
-         - A clear definition of what this attribute represents
-         - A numeric code
-         - Example phrases from the responses
-      5. Group related attributes under themes where possible
-      6. IMPORTANT: Preserve the rowIndex from responsesWithRowIndices for each response in your output
+      Create 5-8 attribute themes. Include: Other, None, Don't Know.
       
-      Format your response as a JSON object with:
-      - codeframe: Array of code objects with {code, numeric, label, definition, examples, themeGroup}
-      - codedResponses: Array of objects with {responseText, columnName, columnIndex, rowIndex, codesAssigned}
-      - attributeThemes: Object mapping themes to arrays of attribute codes`;
+      Return JSON:
+      - codeframe: {code, numeric, label, definition, examples, themeGroup}
+      - codedResponses: {responseText, columnName, columnIndex, rowIndex, codesAssigned}
+      - attributeThemes: theme mapping`;
       break;
       
     case 'miscellaneous':
@@ -382,23 +369,12 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
       promptContent = `I have a survey with the following open-ended questions and responses (each response includes its row index):
       ${JSON.stringify(columns, null, 2)}
       
-      Please analyze these responses and:
-      1. Create a codeframe with 5-10 distinct codes using numeric identifiers
-      2. REQUIRED: Always include these three catch-all categories:
-         - "Other" for responses that don't fit main categories
-         - "None/Nothing" for responses indicating nothing or no answer
-         - "Don't Know/Not Applicable" for uncertain or N/A responses
-      3. For each code, provide:
-         - A short label
-         - A clear definition
-         - A numeric code (e.g., 1, 2, 3 or 1.1, 1.2, etc.)
-         - 2-3 example phrases
-      4. Assign appropriate codes to each response
-      5. IMPORTANT: Preserve the rowIndex from responsesWithRowIndices for each response in your output
+      Create a concise codeframe (5-8 codes max) and code the responses.
+      Include catch-all categories: Other, None, Don't Know.
       
-      Format your response as a JSON object with two properties:
-      - codeframe: An array of code objects with {code, numeric, label, definition, examples}
-      - codedResponses: An array of response objects with {responseText, columnName, columnIndex, rowIndex, codesAssigned}`;
+      Return JSON with:
+      - codeframe: array of {code, numeric, label, definition, examples}
+      - codedResponses: array of {responseText, columnName, columnIndex, rowIndex, codesAssigned}`;
   }
   
   return promptContent;
@@ -478,8 +454,8 @@ const safeParseJSON = (jsonString: string, questionType: string) => {
 // Enhanced error handling for individual question type processing
 const processQuestionTypeWithRetry = async (questionType: string, columns: any[], apiConfig: any, retryCount = 0) => {
   const MAX_RETRIES = 3;
-  const MAX_RESPONSES_PER_BATCH = 10; // Drastically reduced to prevent token overflow
-  const MAX_COLUMNS_PER_REQUEST = 5; // Limit columns per request
+  const MAX_RESPONSES_PER_BATCH = 25; // Can handle more since we filter out non-text
+  const MAX_COLUMNS_PER_REQUEST = 10; // Process all selected columns
   
   try {
     // Limit columns if there are too many
@@ -491,13 +467,22 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
     
     // Transform columns to include row indices and sample if needed
     const processedColumns = columnsToProcess.map(col => {
-      // Get responses with row indices
-      const responsesWithIndices = col.responsesWithIndices?.filter(item => 
-        item.value !== undefined && 
-        item.value !== null && 
-        item.value !== '' &&
-        String(item.value).trim().length > 5
-      ) || [];
+      // Get responses with row indices - ONLY text responses, filter out numbers/codes
+      const responsesWithIndices = col.responsesWithIndices?.filter(item => {
+        if (!item.value) return false;
+        const val = String(item.value).trim();
+        
+        // Skip empty, very short, or numeric-only responses
+        if (val.length < 5) return false;
+        if (/^\d+$/.test(val)) return false; // Skip pure numbers
+        if (/^[0-9\.\,\-]+$/.test(val)) return false; // Skip numeric codes
+        
+        // Must contain at least some letters
+        return /[a-zA-Z]{2,}/.test(val);
+      }) || [];
+      
+      // Log filtering results
+      console.log(`Column ${col.name}: ${responsesWithIndices.length} text responses out of ${col.responsesWithIndices?.length || 0} total`);
       
       // Sample if too many responses
       let sampledResponsesWithIndices = responsesWithIndices;
@@ -527,7 +512,7 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
     const messages = [
       {
         role: "system",
-        content: `You are an expert qualitative researcher analyzing ${questionType} type survey responses. IMPORTANT: Always return valid JSON with proper syntax. Note: You are seeing a sample of responses - create a comprehensive codeframe that would work for the full dataset. Each response in responsesWithRowIndices includes a rowIndex that MUST be preserved in your codedResponses output.`
+        content: `Expert coder for ${questionType} responses. Return valid JSON. Preserve rowIndex in output.`
       },
       {
         role: "user",
