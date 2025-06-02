@@ -664,7 +664,11 @@ const parseRetryAfter = (errorData: any): number | null => {
 };
 
 // Get the processing result - now requires API key
-export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: string, apiUrl: string }): Promise<ApiResponse<ProcessedResult>> => {
+export const getProcessingResult = async (
+  fileId: string, 
+  apiConfig?: { apiKey: string, apiUrl: string },
+  onProgress?: (progress: number, status: string) => void
+): Promise<ApiResponse<ProcessedResult>> => {
   if (!apiConfig?.apiKey) {
     throw new Error('OpenAI API key is required for processing. Please configure your API key first.');
   }
@@ -703,11 +707,20 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     // Process each question type with enhanced error handling
     const results = [];
     const failedTypes = [];
+    const totalTypes = Object.keys(columnsByType).length;
     
     // Add delay between question types to avoid rate limits
     let typeIndex = 0;
     for (const [questionType, columns] of Object.entries(columnsByType)) {
       try {
+        // Calculate progress
+        const baseProgress = (typeIndex / totalTypes) * 80; // 0-80% for processing
+        
+        // Update progress
+        if (onProgress) {
+          onProgress(baseProgress, `Processing ${questionType} (${typeIndex + 1}/${totalTypes})...`);
+        }
+        
         // Add longer delay between question types to avoid rate limits
         if (typeIndex > 0) {
           const delay = 5000 + (typeIndex * 2000); // Progressive delay
@@ -720,12 +733,19 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         results.push(result);
         console.log(`Successfully processed ${questionType}`);
         typeIndex++;
+        
+        // Update progress after successful processing
+        if (onProgress) {
+          const newProgress = (typeIndex / totalTypes) * 80;
+          onProgress(newProgress, `Completed ${questionType} (${typeIndex}/${totalTypes})`);
+        }
       } catch (error) {
         console.error(`Failed to process question type ${questionType}:`, error);
         failedTypes.push({
           questionType,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
+        typeIndex++;
       }
     }
     
@@ -775,6 +795,11 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     // Use the first result as the "primary" one for backward compatibility
     const primaryResult = results[0];
     
+    // Update progress for insights generation
+    if (onProgress) {
+      onProgress(85, 'Generating insights...');
+    }
+    
     // Generate insights if there are multiple question types
     let insights = null;
     if (results.length > 1) {
@@ -816,6 +841,11 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         console.error("Failed to generate insights:", error);
         // Continue without insights if generation fails
       }
+    }
+    
+    // Update progress for completion
+    if (onProgress) {
+      onProgress(95, 'Finalizing results...');
     }
     
     // Return the combined result with partial failure info

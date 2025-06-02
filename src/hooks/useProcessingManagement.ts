@@ -118,27 +118,17 @@ export const useProcessingManagement = (props?: ProcessingManagementProps) => {
 
   const pollForResults = async (fileId: string, apiConfig: ApiConfig, columnQuestionTypes: Record<number, QuestionType>) => {
     try {
-      setProcessingStatus('Analyzing responses by question type...');
-      setProcessingProgress(30);
+      setProcessingStatus('Initializing analysis...');
+      setProcessingProgress(10);
       
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Small initial delay
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      setProcessingStatus('Generating codeframes...');
-      setProcessingProgress(60);
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setProcessingStatus('Mapping responses to codes...');
-      setProcessingProgress(80);
-      
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setProcessingStatus('Generating insights...');
-      setProcessingProgress(90);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const response = await getProcessingResult(fileId, apiConfig);
+      // Pass progress callback to API
+      const response = await getProcessingResult(fileId, apiConfig, (progress, status) => {
+        setProcessingProgress(Math.min(progress + 10, 95)); // Add 10% base progress, cap at 95%
+        setProcessingStatus(status);
+      });
       
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to retrieve results');

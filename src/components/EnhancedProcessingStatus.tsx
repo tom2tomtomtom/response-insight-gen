@@ -61,28 +61,28 @@ const EnhancedProcessingStatus: React.FC = () => {
     
     return [
       {
-        name: 'File Processing',
+        name: 'Initializing',
         icon: <FileText className="h-4 w-4" />,
-        status: currentProgress >= 25 ? 'complete' : currentProgress > 0 ? 'active' : 'pending',
-        progress: Math.min(currentProgress * 4, 100)
+        status: currentProgress >= 20 ? 'complete' : currentProgress > 0 ? 'active' : 'pending',
+        progress: Math.min(currentProgress * 5, 100)
       },
       {
-        name: 'AI Analysis',
+        name: 'Processing Question Types',
         icon: <Brain className="h-4 w-4" />,
-        status: currentProgress >= 50 ? 'complete' : currentProgress >= 25 ? 'active' : 'pending',
-        progress: currentProgress >= 25 ? Math.min((currentProgress - 25) * 4, 100) : 0
+        status: currentProgress >= 80 ? 'complete' : currentProgress >= 20 ? 'active' : 'pending',
+        progress: currentProgress >= 20 ? Math.min(((currentProgress - 20) / 60) * 100, 100) : 0
       },
       {
-        name: 'Codeframe Generation',
+        name: 'Generating Insights',
         icon: <Database className="h-4 w-4" />,
-        status: currentProgress >= 75 ? 'complete' : currentProgress >= 50 ? 'active' : 'pending',
-        progress: currentProgress >= 50 ? Math.min((currentProgress - 50) * 4, 100) : 0
+        status: currentProgress >= 90 ? 'complete' : currentProgress >= 80 ? 'active' : 'pending',
+        progress: currentProgress >= 80 ? Math.min(((currentProgress - 80) / 10) * 100, 100) : 0
       },
       {
         name: 'Finalizing Results',
         icon: <Download className="h-4 w-4" />,
-        status: currentProgress >= 100 ? 'complete' : currentProgress >= 75 ? 'active' : 'pending',
-        progress: currentProgress >= 75 ? Math.min((currentProgress - 75) * 4, 100) : 0
+        status: currentProgress >= 100 ? 'complete' : currentProgress >= 90 ? 'active' : 'pending',
+        progress: currentProgress >= 90 ? Math.min(((currentProgress - 90) / 10) * 100, 100) : 0
       }
     ];
   };
@@ -182,6 +182,22 @@ const EnhancedProcessingStatus: React.FC = () => {
         </div>
 
         {/* Additional info for specific statuses */}
+        {processingStatus?.includes('Processing') && processingStatus?.includes('(') && (
+          <div className="bg-blue-50 p-3 rounded-md">
+            <p className="text-xs text-blue-700">
+              {processingStatus}
+            </p>
+          </div>
+        )}
+        
+        {processingStatus?.includes('Completed') && (
+          <div className="bg-green-50 p-3 rounded-md">
+            <p className="text-xs text-green-700">
+              {processingStatus}
+            </p>
+          </div>
+        )}
+
         {processingStatus?.includes('Sampling') && (
           <div className="bg-blue-50 p-3 rounded-md">
             <p className="text-xs text-blue-700">
