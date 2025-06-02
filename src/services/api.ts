@@ -407,8 +407,8 @@ const safeParseJSON = (jsonString: string, questionType: string) => {
 
 // Enhanced error handling for individual question type processing
 const processQuestionTypeWithRetry = async (questionType: string, columns: any[], apiConfig: any, retryCount = 0) => {
-  const MAX_RETRIES = 2;
-  const MAX_RESPONSES_PER_BATCH = 50; // Limit responses to prevent token overflow
+  const MAX_RETRIES = 3;
+  const MAX_RESPONSES_PER_BATCH = 30; // Reduced to prevent token overflow
   
   try {
     // Transform columns to include row indices and sample if needed
@@ -457,8 +457,8 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
       }
     ];
     
-    // Reduce max_tokens on retry to avoid truncation
-    const maxTokens = retryCount > 0 ? 2000 : 3000;
+    // Further reduce max_tokens to avoid hitting limits
+    const maxTokens = retryCount > 0 ? 1500 : 2000;
     
     const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
       method: 'POST',
@@ -477,7 +477,23 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || errorData.message || `API request failed with status ${response.status}`);
+      const errorMessage = errorData.error?.message || errorData.message || `API request failed with status ${response.status}`;
+      
+      // Check for rate limit error
+      if (response.status === 429 || errorMessage.includes('Rate limit')) {
+        const waitTime = parseRetryAfter(errorData) || Math.pow(2, retryCount + 1) * 1000; // Exponential backoff
+        console.log(`Rate limit hit for ${questionType}. Waiting ${waitTime}ms before retry...`);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        
+        // Force a retry for rate limit errors
+        if (retryCount < MAX_RETRIES) {
+          return processQuestionTypeWithRetry(questionType, columns, apiConfig, retryCount + 1);
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
@@ -518,14 +534,26 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
     console.error(`Error processing question type ${questionType} (attempt ${retryCount + 1}):`, error);
     
     // Retry with reduced complexity if possible
-    if (retryCount < MAX_RETRIES) {
+    if (retryCount < MAX_RETRIES && !error.message.includes('after ' + (MAX_RETRIES + 1) + ' attempts')) {
       console.log(`Retrying ${questionType} with reduced complexity...`);
+      // Add a small delay between retries
+      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
       return processQuestionTypeWithRetry(questionType, columns, apiConfig, retryCount + 1);
     }
     
     // If all retries failed, return a fallback or throw with helpful message
-    throw new Error(`Failed to process ${questionType} after ${MAX_RETRIES + 1} attempts. ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Failed to process ${questionType} after ${retryCount + 1} attempts. ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+};
+
+// Helper function to parse retry-after header or message
+const parseRetryAfter = (errorData: any): number | null => {
+  // Check for retry-after in error message (e.g., "Please try again in 3.517s")
+  const match = errorData.error?.message?.match(/Please try again in ([\d.]+)s/);
+  if (match) {
+    return Math.ceil(parseFloat(match[1]) * 1000) + 500; // Add 500ms buffer
+  }
+  return null;
 };
 
 // Get the processing result - now requires API key
@@ -569,12 +597,21 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     const results = [];
     const failedTypes = [];
     
+    // Add delay between question types to avoid rate limits
+    let typeIndex = 0;
     for (const [questionType, columns] of Object.entries(columnsByType)) {
       try {
+        // Add delay between question types (except for the first one)
+        if (typeIndex > 0) {
+          console.log(`Waiting 2 seconds before processing next question type...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
         console.log(`Processing question type: ${questionType}`);
         const result = await processQuestionTypeWithRetry(questionType, columns, apiConfig);
         results.push(result);
         console.log(`Successfully processed ${questionType}`);
+        typeIndex++;
       } catch (error) {
         console.error(`Failed to process question type ${questionType}:`, error);
         failedTypes.push({
