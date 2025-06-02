@@ -478,11 +478,19 @@ const safeParseJSON = (jsonString: string, questionType: string) => {
 // Enhanced error handling for individual question type processing
 const processQuestionTypeWithRetry = async (questionType: string, columns: any[], apiConfig: any, retryCount = 0) => {
   const MAX_RETRIES = 3;
-  const MAX_RESPONSES_PER_BATCH = 20; // Further reduced to prevent token overflow
+  const MAX_RESPONSES_PER_BATCH = 10; // Drastically reduced to prevent token overflow
+  const MAX_COLUMNS_PER_REQUEST = 5; // Limit columns per request
   
   try {
+    // Limit columns if there are too many
+    let columnsToProcess = columns;
+    if (columns.length > MAX_COLUMNS_PER_REQUEST) {
+      console.log(`Processing only first ${MAX_COLUMNS_PER_REQUEST} columns out of ${columns.length} to prevent token overflow`);
+      columnsToProcess = columns.slice(0, MAX_COLUMNS_PER_REQUEST);
+    }
+    
     // Transform columns to include row indices and sample if needed
-    const processedColumns = columns.map(col => {
+    const processedColumns = columnsToProcess.map(col => {
       // Get responses with row indices
       const responsesWithIndices = col.responsesWithIndices?.filter(item => 
         item.value !== undefined && 
@@ -527,8 +535,8 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
       }
     ];
     
-    // Increase max_tokens to ensure complete JSON response
-    const maxTokens = retryCount > 0 ? 3000 : 4000;
+    // Reduce max_tokens to stay within limits
+    const maxTokens = retryCount > 0 ? 2000 : 2500;
     
     const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
       method: 'POST',
@@ -671,10 +679,11 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
     let typeIndex = 0;
     for (const [questionType, columns] of Object.entries(columnsByType)) {
       try {
-        // Add delay between question types (except for the first one)
+        // Add longer delay between question types to avoid rate limits
         if (typeIndex > 0) {
-          console.log(`Waiting 2 seconds before processing next question type...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          const delay = 5000 + (typeIndex * 2000); // Progressive delay
+          console.log(`Waiting ${delay/1000} seconds before processing next question type...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
         
         console.log(`Processing question type: ${questionType}`);

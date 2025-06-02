@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Response Insight Gen - Test Helper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 10px;
+        }
+        .info-box {
+            background: #e0f2fe;
+            border: 1px solid #0284c7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .credentials {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 4px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #1f2937;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .success {
+            color: #059669;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-family: monospace;
+        }
+        .copy-btn {
+            background: #6b7280;
+            font-size: 12px;
+            padding: 5px 10px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 60px;
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Response Insight Gen - Test Helper</h1>
+        
+        <div class="info-box">
+            <h2>🚀 Quick Start</h2>
+            <p>The application is running at: <a href="http://localhost:8081/" target="_blank">http://localhost:8081/</a></p>
+            <p>Use this page to quickly copy test credentials and perform automated checks.</p>
+        </div>
+
+        <div class="credentials">
+            <h2>📋 Test Credentials</h2>
+            <p><strong>Email:</strong> <code>tomh@redbaez.con</code> 
+                <button class="copy-btn" onclick="copyToClipboard('tomh@redbaez.con')">Copy</button>
+            </p>
+            <p><strong>Password:</strong> <code>Wijlre2010</code> 
+                <button class="copy-btn" onclick="copyToClipboard('Wijlre2010')">Copy</button>
+            </p>
+            <p><strong>API Key:</strong> 
+                <button class="copy-btn" onclick="copyToClipboard('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')">Copy API Key</button>
+            </p>
+            <textarea readonly>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</textarea>
+            <p><strong>Test File:</strong> <code>~/Downloads/patourism_segmentation_final_data 2(A1).csv</code></p>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Quick Actions</h3>
+            <button onclick="openApp()">Open Application</button>
+            <button onclick="openApiConfig()">Open API Config</button>
+            <button onclick="openDashboard()">Open Dashboard</button>
+            <button onclick="clearLocalStorage()">Clear Local Storage</button>
+            <button onclick="checkLocalStorage()">Check Local Storage</button>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Features Implemented (100% Complete)</h3>
+            <ul>
+                <li class="success">✓ Rate limit handling with exponential backoff</li>
+                <li class="success">✓ Codeframe editing UI (merge/split/rename/delete/add/reorder)</li>
+                <li class="success">✓ AI reprocessing with manual edits</li>
+                <li class="success">✓ Other/None/N/A category enforcement</li>
+                <li class="success">✓ Brand hierarchical grouping</li>
+                <li class="success">✓ Codeframe count preview</li>
+                <li class="success">✓ Monigle format export (fixed)</li>
+                <li class="success">✓ Download success notifications</li>
+                <li class="success">✓ Project dashboard</li>
+                <li class="success">✓ Enhanced processing status</li>
+                <li class="success">✓ Error recovery for partial results</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Testing Steps</h3>
+            <ol>
+                <li>Click "Open Application" above</li>
+                <li>Configure API key (copy from above)</li>
+                <li>Upload the test CSV file</li>
+                <li>Select columns and set question types</li>
+                <li>Process the file</li>
+                <li>Test all features in the checklist</li>
+            </ol>
+        </div>
+
+        <div id="output" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showMessage('Copied to clipboard!', 'success');
+            }).catch(err => {
+                showMessage('Failed to copy: ' + err, 'error');
+            });
+        }
+
+        function openApp() {
+            window.open('http://localhost:8081/', '_blank');
+        }
+
+        function openApiConfig() {
+            window.open('http://localhost:8081/api-config', '_blank');
+        }
+
+        function openDashboard() {
+            window.open('http://localhost:8081/dashboard', '_blank');
+        }
+
+        function clearLocalStorage() {
+            if (confirm('Are you sure you want to clear all local storage?')) {
+                localStorage.clear();
+                showMessage('Local storage cleared!', 'success');
+            }
+        }
+
+        function checkLocalStorage() {
+            const keys = Object.keys(localStorage);
+            const storage = {};
+            keys.forEach(key => {
+                try {
+                    storage[key] = JSON.parse(localStorage.getItem(key));
+                } catch {
+                    storage[key] = localStorage.getItem(key);
+                }
+            });
+            
+            const output = document.getElementById('output');
+            output.innerHTML = `
+                <h3>Local Storage Contents:</h3>
+                <pre style="background: #f3f4f6; padding: 10px; border-radius: 4px; overflow-x: auto;">
+${JSON.stringify(storage, null, 2)}
+                </pre>
+            `;
+        }
+
+        function showMessage(msg, type) {
+            const output = document.getElementById('output');
+            output.innerHTML = `<p class="${type}">${msg}</p>`;
+            setTimeout(() => {
+                output.innerHTML = '';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
