@@ -18,6 +18,7 @@ import AttributeThemesTable from './results/AttributeThemesTable';
 import CodedResponsesTable from './results/CodedResponsesTable';
 import StudyOutputFormat from './StudyOutputFormat';
 import BinaryCodedMatrix from './BinaryCodedMatrix';
+import PartialResultsRecovery from './PartialResultsRecovery';
 
 const ResultsView: React.FC = () => {
   const { 
@@ -133,17 +134,36 @@ const ResultsView: React.FC = () => {
   };
   
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Analysis Results
-          <Badge variant="outline" className="flex items-center gap-1">
-            <BarChart className="h-4 w-4" />
-            {results.codedResponses.length} Responses Coded
-          </Badge>
-        </CardTitle>
+    <div className="w-full space-y-4">
+      {/* Show partial results recovery if applicable */}
+      <PartialResultsRecovery 
+        onRetryComplete={(newResults) => {
+          // The results will be handled by the processing context
+          toast({
+            title: "Results Updated",
+            description: "The new results have been loaded successfully.",
+          });
+        }}
+      />
+      
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Analysis Results
+            <div className="flex items-center gap-2">
+              {results.status === 'partial' && (
+                <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-300">
+                  Partial Results
+                </Badge>
+              )}
+              <Badge variant="outline" className="flex items-center gap-1">
+                <BarChart className="h-4 w-4" />
+                {results.codedResponses.length} Responses Coded
+              </Badge>
+            </div>
+          </CardTitle>
         {!apiConfig?.isConfigured && (
-          <Alert variant="warning" className="mt-2 border-orange-300 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+          <Alert className="mt-2 border-orange-300 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
             <AlertCircle className="h-4 w-4 text-orange-500" />
             <AlertTitle>Demo Results</AlertTitle>
             <AlertDescription>
@@ -323,6 +343,7 @@ const ResultsView: React.FC = () => {
         </Button>
       </CardFooter>
     </Card>
+    </div>
   );
 };
 

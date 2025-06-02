@@ -325,7 +325,11 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
       
       Please analyze these responses and:
       1. Create a codeframe with distinct brand codes
-      2. Group related brands under parent systems/categories where appropriate
+      2. IMPORTANT HIERARCHICAL GROUPING RULES:
+         - Group locations under their parent state/region (e.g., "Richmond" → "Virginia")
+         - Group individual stores/branches under their parent company/system
+         - Group product variations under their main brand
+         - Create parent codes with numeric like "10" and child codes like "10.1", "10.2"
       3. REQUIRED: Include these catch-all categories:
          - "Other" for mentions that don't fit main brands
          - "None/Nothing" for no brand mentions
@@ -333,9 +337,13 @@ const generatePromptByQuestionType = (questionType: string, columns: any[], uplo
       4. For each code, provide:
          - A short label (the brand name)
          - A clear definition including parent company if applicable
-         - A numeric code
+         - A numeric code (use hierarchical numbering: parent=10, children=10.1, 10.2)
          - Sample mentions that would be coded to this brand
-      5. If you detect brand hierarchies, create parent codes (e.g., "Hospital System") and child codes (individual hospitals)
+         - parentCode field if this is a child brand
+      5. Examples of hierarchical grouping:
+         - "Walmart in Richmond" → parentCode: "Walmart", also gets "Virginia" location code
+         - "Mayo Clinic Rochester" → parentCode: "Mayo Clinic Health System"
+         - "Coca-Cola Zero" → parentCode: "Coca-Cola Company"
       6. IMPORTANT: Preserve the rowIndex from responsesWithRowIndices for each response in your output
       
       Format your response as a JSON object with:
@@ -418,29 +426,48 @@ const safeParseJSON = (jsonString: string, questionType: string) => {
   } catch (error) {
     console.error(`JSON parsing failed for question type ${questionType}:`, error);
     
-    // Try to extract partial JSON if the response was truncated
-    if (jsonString.includes('"codeframe"') && jsonString.includes('"codedResponses"')) {
-      try {
-        // Find the last complete JSON object
-        let lastValidIndex = -1;
-        let braceCount = 0;
-        
-        for (let i = 0; i < jsonString.length; i++) {
-          if (jsonString[i] === '{') braceCount++;
-          if (jsonString[i] === '}') {
-            braceCount--;
-            if (braceCount === 0) {
-              lastValidIndex = i;
-            }
+    // Try to fix common JSON issues
+    let fixedJson = jsonString;
+    
+    // Fix trailing commas
+    fixedJson = fixedJson.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+    
+    // Try to close unclosed arrays/objects at the end
+    if (fixedJson.includes('"codedResponses"')) {
+      // Count open brackets
+      const openBrackets = (fixedJson.match(/\[/g) || []).length;
+      const closeBrackets = (fixedJson.match(/\]/g) || []).length;
+      const openBraces = (fixedJson.match(/{/g) || []).length;
+      const closeBraces = (fixedJson.match(/}/g) || []).length;
+      
+      // Add missing closing brackets
+      for (let i = 0; i < openBrackets - closeBrackets; i++) {
+        fixedJson += ']';
+      }
+      for (let i = 0; i < openBraces - closeBraces; i++) {
+        fixedJson += '}';
+      }
+    }
+    
+    try {
+      return JSON.parse(fixedJson);
+    } catch (secondError) {
+      // If still fails, try to extract a minimal valid response
+      if (jsonString.includes('"codeframe"')) {
+        try {
+          // Extract just the codeframe part
+          const codeframeMatch = jsonString.match(/"codeframe"\s*:\s*\[([^\]]*)\]/);
+          if (codeframeMatch) {
+            const minimalResponse = {
+              codeframe: JSON.parse('[' + codeframeMatch[1] + ']'),
+              codedResponses: []
+            };
+            console.warn(`Recovered partial codeframe for ${questionType}, but responses may be missing`);
+            return minimalResponse;
           }
+        } catch (minimalError) {
+          console.error(`Minimal recovery failed for question type ${questionType}:`, minimalError);
         }
-        
-        if (lastValidIndex > 0) {
-          const truncatedJson = jsonString.substring(0, lastValidIndex + 1);
-          return JSON.parse(truncatedJson);
-        }
-      } catch (recoveryError) {
-        console.error(`JSON recovery failed for question type ${questionType}:`, recoveryError);
       }
     }
     
@@ -451,7 +478,7 @@ const safeParseJSON = (jsonString: string, questionType: string) => {
 // Enhanced error handling for individual question type processing
 const processQuestionTypeWithRetry = async (questionType: string, columns: any[], apiConfig: any, retryCount = 0) => {
   const MAX_RETRIES = 3;
-  const MAX_RESPONSES_PER_BATCH = 30; // Reduced to prevent token overflow
+  const MAX_RESPONSES_PER_BATCH = 20; // Further reduced to prevent token overflow
   
   try {
     // Transform columns to include row indices and sample if needed
@@ -500,8 +527,8 @@ const processQuestionTypeWithRetry = async (questionType: string, columns: any[]
       }
     ];
     
-    // Further reduce max_tokens to avoid hitting limits
-    const maxTokens = retryCount > 0 ? 1500 : 2000;
+    // Increase max_tokens to ensure complete JSON response
+    const maxTokens = retryCount > 0 ? 3000 : 4000;
     
     const response = await fetch(`${apiConfig.apiUrl || DEFAULT_API_URL}`, {
       method: 'POST',
@@ -670,10 +697,24 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       throw new Error(`Failed to process any question types. Errors: ${errorMessages}`);
     }
     
-    // Show warning if some types failed but others succeeded
-    if (failedTypes.length > 0) {
-      console.warn(`Some question types failed to process:`, failedTypes);
-      // You could show a toast notification here for partial success
+    // Handle partial failures with recovery support
+    const partialResults = {
+      successful: results,
+      failed: failedTypes,
+      recoverable: failedTypes.length > 0 && results.length > 0
+    };
+    
+    // Store partial results for recovery
+    if (partialResults.recoverable) {
+      localStorage.setItem('partial_processing_results', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        fileId,
+        successful: results.map(r => ({ questionType: r.questionType, columnsProcessed: r.columnsProcessed || [] })),
+        failed: failedTypes,
+        columnsByType
+      }));
+      
+      console.warn(`Partial processing results saved. ${results.length} succeeded, ${failedTypes.length} failed.`);
     }
     
     // Combine results from successful question types
@@ -739,7 +780,7 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
       }
     }
     
-    // Return the combined result
+    // Return the combined result with partial failure info
     return {
       success: true,
       data: {
@@ -748,7 +789,13 @@ export const getProcessingResult = async (fileId: string, apiConfig?: { apiKey: 
         codeSummary: primaryResult.codeSummary,
         multipleCodeframes,
         insights,
-        status: 'complete'
+        status: failedTypes.length > 0 ? 'partial' : 'complete',
+        processingDetails: {
+          totalQuestionTypes: Object.keys(columnsByType).length,
+          successfulTypes: results.length,
+          failedTypes: failedTypes.length,
+          failures: failedTypes
+        }
       }
     };
   } catch (error) {
@@ -1228,5 +1275,128 @@ export const generateExcelWithOriginalData = async (result: ProcessedResult, raw
   } catch (error) {
     console.error("Error in Excel generation:", error);
     throw error instanceof Error ? error : new Error('Unknown error occurred during Excel generation');
+  }
+};
+
+// Get partial processing results from storage
+export const getPartialResults = (): {
+  timestamp: string;
+  fileId: string;
+  successful: Array<{ questionType: string; columnsProcessed: string[] }>;
+  failed: Array<{ questionType: string; error: string }>;
+  columnsByType: Record<string, any[]>;
+} | null => {
+  try {
+    const stored = localStorage.getItem('partial_processing_results');
+    if (!stored) return null;
+    
+    const data = JSON.parse(stored);
+    // Check if results are less than 24 hours old
+    const timestamp = new Date(data.timestamp);
+    const hoursSince = (Date.now() - timestamp.getTime()) / (1000 * 60 * 60);
+    
+    if (hoursSince > 24) {
+      localStorage.removeItem('partial_processing_results');
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error reading partial results:', error);
+    return null;
+  }
+};
+
+// Clear partial results
+export const clearPartialResults = () => {
+  localStorage.removeItem('partial_processing_results');
+};
+
+// Retry failed question types
+export const retryFailedQuestionTypes = async (
+  failedTypes: Array<{ questionType: string; error: string }>,
+  columnsByType: Record<string, any[]>,
+  apiConfig: { apiKey: string; apiUrl: string }
+): Promise<ApiResponse<ProcessedResult>> => {
+  try {
+    console.log('Retrying failed question types:', failedTypes.map(f => f.questionType));
+    
+    const results = [];
+    const stillFailedTypes = [];
+    
+    // Retry each failed type with longer delays
+    let typeIndex = 0;
+    for (const failed of failedTypes) {
+      const columns = columnsByType[failed.questionType];
+      if (!columns) continue;
+      
+      try {
+        // Add longer delay for retries
+        if (typeIndex > 0) {
+          console.log(`Waiting 5 seconds before retrying ${failed.questionType}...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        
+        console.log(`Retrying question type: ${failed.questionType}`);
+        const result = await processQuestionTypeWithRetry(failed.questionType, columns, apiConfig);
+        results.push(result);
+        console.log(`Successfully processed ${failed.questionType} on retry`);
+        typeIndex++;
+      } catch (error) {
+        console.error(`Failed to process ${failed.questionType} on retry:`, error);
+        stillFailedTypes.push({
+          questionType: failed.questionType,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+    
+    // Clear partial results if all retries succeeded
+    if (stillFailedTypes.length === 0) {
+      clearPartialResults();
+    }
+    
+    // Combine results
+    const allCodedResponses: any[] = [];
+    const multipleCodeframes: Record<string, any> = {};
+    
+    results.forEach(result => {
+      if (!result) return;
+      
+      allCodedResponses.push(...result.codedResponses);
+      
+      multipleCodeframes[result.questionType] = {
+        codeframe: result.codeframe,
+        codeSummary: result.codeSummary,
+        brandHierarchies: result.brandHierarchies,
+        attributeThemes: result.attributeThemes
+      };
+    });
+    
+    const primaryResult = results[0];
+    
+    return {
+      success: true,
+      data: {
+        codeframe: primaryResult?.codeframe || [],
+        codedResponses: allCodedResponses,
+        codeSummary: primaryResult?.codeSummary || [],
+        multipleCodeframes,
+        insights: null,
+        status: stillFailedTypes.length > 0 ? 'partial' : 'complete',
+        processingDetails: {
+          totalQuestionTypes: failedTypes.length,
+          successfulTypes: results.length,
+          failedTypes: stillFailedTypes.length,
+          failures: stillFailedTypes
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Retry processing failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
   }
 };

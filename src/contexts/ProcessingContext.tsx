@@ -601,8 +601,9 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Matrix Downloaded",
-      description: "Binary-coded matrix has been downloaded as CSV."
+      title: "✅ Binary Matrix Downloaded Successfully",
+      description: "Binary-coded matrix has been saved to your downloads folder",
+      duration: 5000,
     });
   };
 

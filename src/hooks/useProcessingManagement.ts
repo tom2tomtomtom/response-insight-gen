@@ -157,10 +157,32 @@ export const useProcessingManagement = () => {
       setProcessingProgress(100);
       setProcessingStatus('Analysis complete!');
       
-      toast({
-        title: "Analysis Complete",
-        description: `Successfully analyzed ${response.data.codedResponses.length} responses across ${Object.keys(columnQuestionTypes).length || 1} question types`,
-      });
+      // Check if we have partial results
+      if (response.data.status === 'partial' && response.data.processingDetails) {
+        const { successfulTypes, failedTypes, failures } = response.data.processingDetails;
+        
+        toast({
+          title: "⚠️ Partial Analysis Complete",
+          description: `Successfully processed ${successfulTypes} of ${successfulTypes + failedTypes} question types. ${failedTypes} failed.`,
+        });
+        
+        // Show detailed failure info
+        if (failures && failures.length > 0) {
+          setTimeout(() => {
+            toast({
+              title: "Failed Question Types",
+              description: failures.map(f => `${f.questionType}: ${f.error}`).join(', '),
+              variant: "destructive",
+              duration: 10000,
+            });
+          }, 1000);
+        }
+      } else {
+        toast({
+          title: "Analysis Complete",
+          description: `Successfully analyzed ${response.data.codedResponses.length} responses across ${Object.keys(columnQuestionTypes).length || 1} question types`,
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -246,8 +268,9 @@ export const useProcessingManagement = () => {
       URL.revokeObjectURL(url);
       
       toast({
-        title: "Download Started",
-        description: "Your Excel file is being downloaded",
+        title: "✅ Excel Downloaded Successfully",
+        description: "Your coded responses file has been saved to your downloads folder",
+        duration: 5000,
       });
     } catch (error) {
       toast({
@@ -272,26 +295,27 @@ export const useProcessingManagement = () => {
 
     try {
       setIsGeneratingExcel(true);
-      setProcessingStatus('Generating Moniglew-style CSV...');
+      setProcessingStatus('Generating Monigle-style CSV...');
       
       // Use the new formatter
-      const { MoniglewStyleFormatter } = await import('../utils/moniglewStyleFormatter');
-      const formatter = new MoniglewStyleFormatter(results);
+      const { MonigleStyleFormatter } = await import('../utils/monigleStyleFormatter');
+      const formatter = new MonigleStyleFormatter(results);
       const csv = formatter.generateCSV();
       
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'moniglew_style_output.csv';
+      a.download = 'monigle_style_output.csv';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
       toast({
-        title: "Moniglew CSV Downloaded",
-        description: "Your industry-standard CSV file has been generated",
+        title: "✅ Monigle CSV Downloaded Successfully",
+        description: "Your industry-standard CSV file has been saved to your downloads folder",
+        duration: 5000,
       });
     } catch (error) {
       toast({

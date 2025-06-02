@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useProcessing } from '../contexts/ProcessingContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -7,29 +6,18 @@ import { Badge } from './ui/badge';
 import { 
   CheckCircle, 
   Loader2, 
-  FileText, 
-  Brain, 
-  Target, 
-  Sparkles, 
-  BarChart3,
   Clock,
-  Zap,
-  Eye
+  FileText,
+  Brain,
+  Database,
+  Download
 } from 'lucide-react';
-import { Button } from './ui/button';
 
-interface ProcessingStage {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ElementType;
-  progress: number;
+interface ProcessingStep {
+  name: string;
+  icon: React.ReactNode;
   status: 'pending' | 'active' | 'complete';
-  liveStats?: {
-    processed: number;
-    total: number;
-    rate: string;
-  };
+  progress: number;
 }
 
 const EnhancedProcessingStatus: React.FC = () => {
@@ -38,116 +26,79 @@ const EnhancedProcessingStatus: React.FC = () => {
     processingStatus, 
     processingProgress,
     selectedColumns,
-    results 
+    columnQuestionTypes
   } = useProcessing();
   
-  const [currentStage, setCurrentStage] = useState(0);
-  const [processingLog, setProcessingLog] = useState<string[]>([]);
-  const [liveStats, setLiveStats] = useState({
-    responsesProcessed: 0,
-    codesIdentified: 0,
-    themesEmerging: 0,
-    insightsGenerated: 0
-  });
-  const [showDetailedView, setShowDetailedView] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [startTime, setStartTime] = useState<number | null>(null);
 
-  // Define processing stages with more detail
-  const stages: ProcessingStage[] = [
-    {
-      id: 'preparation',
-      title: 'Data Preparation',
-      description: 'Parsing file structure and cleaning response data',
-      icon: FileText,
-      progress: Math.min(processingProgress * 4, 100),
-      status: processingProgress < 25 ? (isProcessing ? 'active' : 'pending') : 'complete'
-    },
-    {
-      id: 'analysis',
-      title: 'AI Analysis',
-      description: 'Deep learning algorithms analyzing response patterns',
-      icon: Brain,
-      progress: Math.max(0, Math.min((processingProgress - 25) * 4, 100)),
-      status: processingProgress < 25 ? 'pending' : processingProgress < 50 ? 'active' : 'complete',
-      liveStats: {
-        processed: liveStats.responsesProcessed,
-        total: 1000, // This would come from actual data
-        rate: '45 responses/sec'
-      }
-    },
-    {
-      id: 'codeframe',
-      title: 'Codeframe Generation',
-      description: 'Building intelligent code structures and hierarchies',
-      icon: Target,
-      progress: Math.max(0, Math.min((processingProgress - 50) * 4, 100)),
-      status: processingProgress < 50 ? 'pending' : processingProgress < 75 ? 'active' : 'complete',
-      liveStats: {
-        processed: liveStats.codesIdentified,
-        total: 50,
-        rate: '3 codes/sec'
-      }
-    },
-    {
-      id: 'insights',
-      title: 'Insights Generation',
-      description: 'Extracting meaningful patterns and generating insights',
-      icon: Sparkles,
-      progress: Math.max(0, Math.min((processingProgress - 75) * 4, 100)),
-      status: processingProgress < 75 ? 'pending' : processingProgress < 100 ? 'active' : 'complete',
-      liveStats: {
-        processed: liveStats.insightsGenerated,
-        total: 15,
-        rate: '2 insights/sec'
-      }
+  useEffect(() => {
+    if (isProcessing && !startTime) {
+      setStartTime(Date.now());
+      setElapsedTime(0);
+    } else if (!isProcessing) {
+      setStartTime(null);
     }
-  ];
+  }, [isProcessing, startTime]);
 
-  // Simulate real-time updates during processing
   useEffect(() => {
-    if (!isProcessing) return;
+    if (startTime) {
+      const timer = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [startTime]);
 
-    const interval = setInterval(() => {
-      // Update live stats
-      setLiveStats(prev => ({
-        responsesProcessed: Math.min(prev.responsesProcessed + Math.floor(Math.random() * 10), 1000),
-        codesIdentified: Math.min(prev.codesIdentified + Math.floor(Math.random() * 2), 50),
-        themesEmerging: Math.min(prev.themesEmerging + Math.floor(Math.random() * 1), 25),
-        insightsGenerated: Math.min(prev.insightsGenerated + Math.floor(Math.random() * 1), 15)
-      }));
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
-      // Add processing log entries
-      const logMessages = [
-        "Analyzing brand mentions and sentiment...",
-        "Identifying recurring themes and patterns...",
-        "Processing open-ended responses...",
-        "Generating semantic clusters...",
-        "Building hierarchical code structure...",
-        "Extracting key insights...",
-        "Mapping responses to codes...",
-        "Calculating confidence scores..."
-      ];
-      
-      if (Math.random() > 0.7) {
-        const randomMessage = logMessages[Math.floor(Math.random() * logMessages.length)];
-        setProcessingLog(prev => [...prev.slice(-4), randomMessage]);
+  const getProcessingSteps = (): ProcessingStep[] => {
+    const currentProgress = processingProgress || 0;
+    
+    return [
+      {
+        name: 'File Processing',
+        icon: <FileText className="h-4 w-4" />,
+        status: currentProgress >= 25 ? 'complete' : currentProgress > 0 ? 'active' : 'pending',
+        progress: Math.min(currentProgress * 4, 100)
+      },
+      {
+        name: 'AI Analysis',
+        icon: <Brain className="h-4 w-4" />,
+        status: currentProgress >= 50 ? 'complete' : currentProgress >= 25 ? 'active' : 'pending',
+        progress: currentProgress >= 25 ? Math.min((currentProgress - 25) * 4, 100) : 0
+      },
+      {
+        name: 'Codeframe Generation',
+        icon: <Database className="h-4 w-4" />,
+        status: currentProgress >= 75 ? 'complete' : currentProgress >= 50 ? 'active' : 'pending',
+        progress: currentProgress >= 50 ? Math.min((currentProgress - 50) * 4, 100) : 0
+      },
+      {
+        name: 'Finalizing Results',
+        icon: <Download className="h-4 w-4" />,
+        status: currentProgress >= 100 ? 'complete' : currentProgress >= 75 ? 'active' : 'pending',
+        progress: currentProgress >= 75 ? Math.min((currentProgress - 75) * 4, 100) : 0
       }
-    }, 800);
+    ];
+  };
 
-    return () => clearInterval(interval);
-  }, [isProcessing]);
-
-  // Update current stage based on progress
-  useEffect(() => {
-    if (processingProgress < 25) setCurrentStage(0);
-    else if (processingProgress < 50) setCurrentStage(1);
-    else if (processingProgress < 75) setCurrentStage(2);
-    else setCurrentStage(3);
-  }, [processingProgress]);
+  const getQuestionTypeCount = () => {
+    const types = new Set(Object.values(columnQuestionTypes));
+    return types.size || 1;
+  };
 
   if (!isProcessing && processingProgress === 0) {
     return null;
   }
-
+  
+  const steps = getProcessingSteps();
+  const activeStep = steps.find(s => s.status === 'active');
+  
   return (
     <Card className="w-full">
       <CardHeader>
@@ -158,130 +109,92 @@ const EnhancedProcessingStatus: React.FC = () => {
             ) : (
               <CheckCircle className="h-5 w-5 text-green-500" />
             )}
-            <span>
-              {processingProgress < 100 ? 'AI Analysis in Progress' : 'Analysis Complete!'}
-            </span>
+            <span>Processing Status</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline" className="animate-pulse">
+          <div className="flex items-center gap-3 text-sm">
+            <Badge variant="outline" className="flex items-center gap-1">
+              <FileText className="h-3 w-3" />
               {selectedColumns.length} columns
             </Badge>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDetailedView(!showDetailedView)}
-            >
-              <Eye className="h-4 w-4 mr-1" />
-              {showDetailedView ? 'Simple' : 'Detailed'}
-            </Button>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Brain className="h-3 w-3" />
+              {getQuestionTypeCount()} codeframe{getQuestionTypeCount() > 1 ? 's' : ''}
+            </Badge>
+            {isProcessing && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatTime(elapsedTime)}
+              </Badge>
+            )}
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Overall Progress */}
+      <CardContent className="space-y-4">
+        {/* Main progress bar */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="font-medium">{processingStatus}</span>
-            <span className="text-muted-foreground">{processingProgress}%</span>
+            <span className="text-muted-foreground">
+              {processingStatus || (activeStep ? activeStep.name : 'Preparing...')}
+            </span>
+            <span className="font-medium">{processingProgress}%</span>
           </div>
-          <Progress value={processingProgress} className="h-3" />
+          <Progress value={processingProgress} className="h-2" />
         </div>
-
-        {/* Processing Stages */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stages.map((stage, index) => {
-            const StageIcon = stage.icon;
-            const isActive = stage.status === 'active';
-            const isComplete = stage.status === 'complete';
-            
-            return (
-              <div
-                key={stage.id}
-                className={`p-4 rounded-lg border transition-all duration-300 ${
-                  isActive 
-                    ? 'bg-primary/5 border-primary shadow-md scale-105' 
-                    : isComplete 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-muted/50 border-muted'
-                }`}
-              >
-                <div className="flex items-center space-x-2 mb-2">
-                  <StageIcon 
-                    className={`h-5 w-5 ${
-                      isActive ? 'text-primary animate-pulse' : 
-                      isComplete ? 'text-green-500' : 'text-muted-foreground'
-                    }`} 
-                  />
-                  <span className="font-medium text-sm">{stage.title}</span>
-                </div>
-                <p className="text-xs text-muted-foreground mb-2">{stage.description}</p>
-                
-                {stage.progress > 0 && (
-                  <Progress value={stage.progress} className="h-1 mb-2" />
-                )}
-                
-                {showDetailedView && isActive && stage.liveStats && (
-                  <div className="space-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span>Processed:</span>
-                      <span className="font-mono">{stage.liveStats.processed}/{stage.liveStats.total}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Rate:</span>
-                      <span className="font-mono text-primary">{stage.liveStats.rate}</span>
-                    </div>
-                  </div>
+        
+        {/* Detailed steps */}
+        <div className="space-y-3">
+          {steps.map((step, index) => (
+            <div key={index} className="flex items-center space-x-3">
+              <div className={`
+                flex items-center justify-center w-8 h-8 rounded-full
+                ${step.status === 'complete' ? 'bg-green-100 text-green-600' :
+                  step.status === 'active' ? 'bg-primary/10 text-primary' :
+                  'bg-muted text-muted-foreground'}
+              `}>
+                {step.status === 'complete' ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : step.status === 'active' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  step.icon
                 )}
               </div>
-            );
-          })}
+              
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-sm font-medium
+                    ${step.status === 'pending' ? 'text-muted-foreground' : ''}
+                  `}>
+                    {step.name}
+                  </span>
+                  {step.status === 'active' && (
+                    <span className="text-xs text-muted-foreground">
+                      {step.progress}%
+                    </span>
+                  )}
+                </div>
+                {step.status === 'active' && (
+                  <Progress value={step.progress} className="h-1" />
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Live Statistics Panel */}
-        {showDetailedView && isProcessing && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{liveStats.responsesProcessed}</div>
-              <div className="text-xs text-muted-foreground">Responses Analyzed</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-500">{liveStats.codesIdentified}</div>
-              <div className="text-xs text-muted-foreground">Codes Identified</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-500">{liveStats.themesEmerging}</div>
-              <div className="text-xs text-muted-foreground">Themes Emerging</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-500">{liveStats.insightsGenerated}</div>
-              <div className="text-xs text-muted-foreground">Insights Generated</div>
-            </div>
+        {/* Additional info for specific statuses */}
+        {processingStatus?.includes('Sampling') && (
+          <div className="bg-blue-50 p-3 rounded-md">
+            <p className="text-xs text-blue-700">
+              Processing a representative sample to generate comprehensive codeframes...
+            </p>
           </div>
         )}
 
-        {/* Processing Log */}
-        {showDetailedView && processingLog.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Processing Activity</span>
-            </div>
-            <div className="bg-muted/30 rounded-lg p-3 space-y-1 max-h-32 overflow-y-auto">
-              {processingLog.map((message, index) => (
-                <div key={index} className="flex items-center space-x-2 text-xs">
-                  <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                  <span className="text-muted-foreground">{message}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Performance Indicator */}
-        {isProcessing && (
-          <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-            <Zap className="h-4 w-4 text-yellow-500" />
-            <span>High-performance AI processing active</span>
+        {processingStatus?.includes('Rate limit') && (
+          <div className="bg-orange-50 p-3 rounded-md">
+            <p className="text-xs text-orange-700">
+              Waiting for rate limit cooldown. Processing will resume automatically...
+            </p>
           </div>
         )}
       </CardContent>

@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { FileSpreadsheet, BarChart3, Download } from 'lucide-react';
 import { ProcessedResult } from '../types';
-import { MoniglewStyleFormatter } from '../utils/moniglewStyleFormatter';
+import { MonigleStyleFormatter } from '../utils/monigleStyleFormatter';
 interface StudyOutputFormatProps {
   results: ProcessedResult;
   studyId?: string;
@@ -14,9 +14,9 @@ const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({
   results,
   studyId = "20250128"
 }) => {
-  const formatter = useMemo(() => new MoniglewStyleFormatter(results), [results]);
+  const formatter = useMemo(() => new MonigleStyleFormatter(results), [results]);
   const columnMetadata = useMemo(() => formatter.getColumnMetadata(), [formatter]);
-  const handleDownloadMoniglewCSV = () => {
+  const handleDownloadMonigleCSV = () => {
     const csv = formatter.generateCSV();
     const blob = new Blob([csv], {
       type: 'text/csv;charset=utf-8;'
@@ -24,7 +24,7 @@ const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `moniglew_style_output_${studyId}.csv`);
+    link.setAttribute('download', `monigle_style_output_${studyId}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -43,9 +43,9 @@ const StudyOutputFormat: React.FC<StudyOutputFormatProps> = ({
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
-            Moniglew-Style Brand Tracking Output
+            Monigle-Style Brand Tracking Output
           </div>
-          <Button onClick={handleDownloadMoniglewCSV} className="flex items-center gap-2">
+          <Button onClick={handleDownloadMonigleCSV} className="flex items-center gap-2">
             <Download className="h-4 w-4" />
             Download CSV
           </Button>

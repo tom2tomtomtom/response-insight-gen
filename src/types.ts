@@ -59,11 +59,17 @@ export interface ProcessedResult {
   codeframe: CodeframeEntry[];
   codedResponses: CodedResponse[];
   codeSummary: CodeSummary[]; // Add summary stats for codes
-  status: 'complete' | 'processing' | 'failed';
+  status: 'complete' | 'processing' | 'failed' | 'partial';
   error?: string;
   // Add the new properties
   multipleCodeframes?: Record<string, QuestionTypeCodeframe>;
   insights?: string; // For AI-generated commentary
+  processingDetails?: {
+    totalQuestionTypes: number;
+    successfulTypes: number;
+    failedTypes: number;
+    failures: Array<{ questionType: string; error: string }>;
+  };
 }
 
 export interface ApiResponse<T> {

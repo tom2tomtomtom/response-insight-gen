@@ -7,6 +7,7 @@ import Index from './pages/Index';
 import ApiConfig from './pages/ApiConfig';
 import NotFound from './pages/NotFound';
 import UploadCodeframe from './pages/UploadCodeframe';
+import Dashboard from './pages/Dashboard';
 import './App.css';
 import './styles/excel-table.css';
 
@@ -16,6 +17,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/api-config" element={<ApiConfig />} />
           <Route path="/upload-codeframe" element={<UploadCodeframe />} />
           <Route path="/404" element={<NotFound />} />
