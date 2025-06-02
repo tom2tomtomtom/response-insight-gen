@@ -19,6 +19,8 @@ import CodedResponsesTable from './results/CodedResponsesTable';
 import StudyOutputFormat from './StudyOutputFormat';
 import BinaryCodedMatrix from './BinaryCodedMatrix';
 import PartialResultsRecovery from './PartialResultsRecovery';
+import FinalizeCodeframe from './FinalizeCodeframe';
+import CodeframeRefinement from './CodeframeRefinement';
 
 const ResultsView: React.FC = () => {
   const { 
@@ -31,7 +33,11 @@ const ResultsView: React.FC = () => {
     rawFileData,
     multipleCodeframes,
     insights,
-    downloadBinaryMatrix
+    downloadBinaryMatrix,
+    isRefinementMode,
+    toggleRefinementMode,
+    refineCodeframe,
+    isCodeframeFinalized
   } = useProcessing();
   
   const [searchFilter, setSearchFilter] = useState('');
@@ -201,6 +207,13 @@ const ResultsView: React.FC = () => {
         {currentCodeSummary && currentCodeSummary.length > 0 && (
           <CodeSummaryChart codeSummary={currentCodeSummary} />
         )}
+        
+        {/* Finalize Codeframe Component */}
+        <FinalizeCodeframe 
+          codeframeCount={currentCodeframe.length}
+          codedResponsesCount={results.codedResponses?.length || 0}
+          totalResponsesCount={rawFileData ? rawFileData.length - 1 : 0}
+        />
       
         <Tabs defaultValue="output-format">
           <TabsList className="grid w-full grid-cols-4">
@@ -238,7 +251,17 @@ const ResultsView: React.FC = () => {
               </>
             )}
             
-            <CodeframeTable codeframe={currentCodeframe} />
+            <div className="space-y-4">
+              <CodeframeRefinement
+                codeframe={currentCodeframe}
+                onRefine={refineCodeframe}
+                isRefinementMode={isRefinementMode}
+                onToggleRefinement={toggleRefinementMode}
+              />
+              {!isRefinementMode && (
+                <CodeframeTable codeframe={currentCodeframe} />
+              )}
+            </div>
           </TabsContent>
           
           <TabsContent value="responses" className="mt-4">

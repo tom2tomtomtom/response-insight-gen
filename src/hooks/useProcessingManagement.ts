@@ -45,7 +45,8 @@ export const useProcessingManagement = () => {
     fileColumns: any[],
     columnQuestionTypes: Record<number, QuestionType>,
     columnSettings: any,
-    apiConfig: ApiConfig | null
+    apiConfig: ApiConfig | null,
+    options?: { applyToFullDataset?: boolean }
   ) => {
     if (!uploadedFile || !uploadedFile.id) {
       toast({

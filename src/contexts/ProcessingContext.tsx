@@ -16,7 +16,10 @@ const STORAGE_KEYS = {
   TRACKING_CONFIG: 'response-insight-tracking-config',
   BRAND_LIST: 'response-insight-brand-list',
   UPLOADED_CODEFRAMES: 'response-insight-uploaded-codeframes',
-  API_CONFIG: 'response-insight-api-config'
+  API_CONFIG: 'response-insight-api-config',
+  COMPLETE_STATE: 'response-insight-complete-state',
+  SELECTED_COLUMNS: 'response-insight-selected-columns',
+  COLUMN_CONFIGS: 'response-insight-column-configs'
 };
 
 export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -90,6 +93,18 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
         // Only restore non-sensitive parts
         setApiConfig({ ...config, apiKey: '' });
       }
+
+      // Load selected columns
+      const savedSelectedColumns = localStorage.getItem(STORAGE_KEYS.SELECTED_COLUMNS);
+      if (savedSelectedColumns) {
+        setSelectedColumns(JSON.parse(savedSelectedColumns));
+      }
+
+      // Load column configs
+      const savedColumnConfigs = localStorage.getItem(STORAGE_KEYS.COLUMN_CONFIGS);
+      if (savedColumnConfigs) {
+        setColumnQuestionConfigs(JSON.parse(savedColumnConfigs));
+      }
     } catch (error) {
       console.error('Error loading persisted data:', error);
     }
@@ -125,6 +140,20 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       localStorage.setItem(STORAGE_KEYS.UPLOADED_CODEFRAMES, JSON.stringify(uploadedCodeframes));
     }
   }, [uploadedCodeframes]);
+
+  // Persist selected columns
+  useEffect(() => {
+    if (selectedColumns.length > 0) {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_COLUMNS, JSON.stringify(selectedColumns));
+    }
+  }, [selectedColumns]);
+
+  // Persist column configs
+  useEffect(() => {
+    if (Object.keys(columnQuestionConfigs).length > 0) {
+      localStorage.setItem(STORAGE_KEYS.COLUMN_CONFIGS, JSON.stringify(columnQuestionConfigs));
+    }
+  }, [columnQuestionConfigs]);
 
   const { isUploading, setIsUploading, parseExcelFile, parseCSVFile } = useFileParsing();
   const { 
@@ -205,7 +234,7 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
 
-  const startProcessing = async () => {
+  const startProcessing = async (options?: { applyToFullDataset?: boolean }) => {
     if (!uploadedFile) return;
     await handleStartProcessing(
       uploadedFile,
@@ -213,7 +242,8 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
       fileColumns,
       columnQuestionTypes,
       columnSettings,
-      apiConfig
+      apiConfig,
+      options
     );
   };
 
@@ -316,7 +346,10 @@ export const ProcessingProvider: React.FC<{ children: ReactNode }> = ({ children
     // Clear persisted data when resetting
     localStorage.removeItem(STORAGE_KEYS.PROJECT_CONTEXT);
     localStorage.removeItem(STORAGE_KEYS.BRAND_LIST);
-    // Keep codeframe rules, tracking config, and uploaded codeframes as they are reusable
+    localStorage.removeItem(STORAGE_KEYS.SELECTED_COLUMNS);
+    localStorage.removeItem(STORAGE_KEYS.COLUMN_CONFIGS);
+    localStorage.removeItem(STORAGE_KEYS.UPLOADED_CODEFRAMES);
+    // Keep codeframe rules and tracking config as they are reusable
   };
 
   const finalizeCodeframe = () => {
