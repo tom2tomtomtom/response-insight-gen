@@ -1,0 +1,21 @@
+Respondent_ID,Q1_Brand_Awareness,Q2_Brand_Description,Q3_Purchase_Intent,Q4_Additional_Comments
+R001,Nike Adidas,Nike is sporty and trendy,Very likely,Great brand quality
+R002,Apple Samsung,Apple is innovative and premium,Somewhat likely,Love the design
+R003,Coca-Cola Pepsi,Coca-Cola is refreshing and classic,Not likely,Too sugary for me
+R004,McDonald's KFC,McDonald's is fast and convenient,Very likely,Good value for money
+R005,Toyota Honda,Toyota is reliable and durable,Very likely,Best cars ever
+R006,Amazon Google,Amazon is convenient and fast delivery,Somewhat likely,Sometimes expensive
+R007,Nike Apple,Apple is sleek and user-friendly,Very likely,Amazing customer service
+R008,Starbucks,Starbucks is premium coffee experience,Not likely,Too expensive
+R009,Microsoft Google Apple,Microsoft is business-focused and reliable,Somewhat likely,Good for work
+R010,Disney Netflix,Disney is family-friendly and magical,Very likely,Great entertainment
+R011,BMW Mercedes,BMW is luxury and performance,Not likely,Can't afford it
+R012,Samsung Apple,Samsung has good technology and value,Somewhat likely,Good features
+R013,Walmart Target,Walmart is affordable and accessible,Very likely,One-stop shopping
+R014,Facebook Instagram,Facebook helps stay connected,Not likely,Privacy concerns
+R015,Sony Nintendo,Sony has quality electronics,Somewhat likely,Gaming is fun
+R016,Pepsi Coca-Cola,Pepsi is younger and energetic,Very likely,Prefer the taste
+R017,Netflix YouTube,Netflix has great original content,Very likely,Binge-watching
+R018,Ford Chevrolet,Ford is American and strong,Somewhat likely,Patriotic choice
+R019,McDonald's Subway,Subway is healthier fast food,Very likely,Fresh ingredients
+R020,Google Microsoft,Google is innovative search,Somewhat likely,Very useful

@@ -70,6 +70,13 @@ const ProjectUpload: React.FC = () => {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
+      // Check file size (warn if > 10MB)
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        toast({
+          title: "Large file detected",
+          description: "Files over 10MB may have limited functionality. Consider using a smaller sample.",
+        });
+      }
       setFile(selectedFile);
       setIsProcessed(false);
       setColumns([]);
@@ -120,22 +127,34 @@ const ProjectUpload: React.FC = () => {
           const analyzedColumns = analyzeColumns(data);
           setColumns(analyzedColumns);
 
-          // Save file info to project
+          // Save file info to project (optimize storage by limiting raw data)
           const fileInfo = {
             filename: file.name,
             uploadedAt: new Date(),
             columns: analyzedColumns,
             totalRows: data.length - 1, // Exclude header
-            rawData: data
+            rawData: data.slice(0, Math.min(1000, data.length)) // Limit to first 1000 rows for localStorage
           };
 
-          localStorage.setItem(`qualicoding-project-${projectId}-file`, JSON.stringify(fileInfo));
-          
-          setIsProcessed(true);
-          toast({
-            title: "File processed successfully",
-            description: `Found ${analyzedColumns.filter(col => col.type === 'text').length} text columns ready for analysis.`,
-          });
+          try {
+            localStorage.setItem(`qualicoding-project-${projectId}-file`, JSON.stringify(fileInfo));
+            setIsProcessed(true);
+            toast({
+              title: "File processed successfully",
+              description: `Found ${analyzedColumns.filter(col => col.type === 'text').length} text columns ready for analysis.`,
+            });
+          } catch (storageError) {
+            // Handle localStorage quota exceeded
+            if (storageError instanceof DOMException && storageError.code === 22) {
+              toast({
+                variant: "destructive",
+                title: "File too large for browser storage",
+                description: "Please try a smaller file or contact support for backend storage options.",
+              });
+            } else {
+              throw storageError;
+            }
+          }
         } catch (error) {
           console.error('Error processing file:', error);
           toast({
