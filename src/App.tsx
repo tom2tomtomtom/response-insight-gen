@@ -3,12 +3,16 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { Toaster } from './components/ui/toaster';
-import Index from './pages/Index';
-import ApiConfig from './pages/ApiConfig';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Login';
+import NewDashboard from './pages/NewDashboard';
+import ProjectSetup from './pages/ProjectSetup';
+import ProjectUpload from './pages/ProjectUpload';
+import ProjectColumns from './pages/ProjectColumns';
+import ProjectGrouping from './pages/ProjectGrouping';
+import ProjectGenerate from './pages/ProjectGenerate';
+import ProjectResults from './pages/ProjectResults';
 import NotFound from './pages/NotFound';
-import UploadCodeframe from './pages/UploadCodeframe';
-import Dashboard from './pages/Dashboard';
-import ProjectDashboard from './pages/ProjectDashboard';
 import './App.css';
 import './styles/excel-table.css';
 
@@ -17,12 +21,44 @@ function App() {
     <ProcessingProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/projects" element={<ProjectDashboard />} />
-          <Route path="/api-config" element={<ApiConfig />} />
-          <Route path="/upload-codeframe" element={<UploadCodeframe />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <NewDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/project/new" element={
+            <ProtectedRoute>
+              <ProjectSetup />
+            </ProtectedRoute>
+          } />
+          <Route path="/project/:projectId/upload" element={
+            <ProtectedRoute>
+              <ProjectUpload />
+            </ProtectedRoute>
+          } />
+          <Route path="/project/:projectId/columns" element={
+            <ProtectedRoute>
+              <ProjectColumns />
+            </ProtectedRoute>
+          } />
+          <Route path="/project/:projectId/grouping" element={
+            <ProtectedRoute>
+              <ProjectGrouping />
+            </ProtectedRoute>
+          } />
+          <Route path="/project/:projectId/generate" element={
+            <ProtectedRoute>
+              <ProjectGenerate />
+            </ProtectedRoute>
+          } />
+          <Route path="/project/:projectId/results" element={
+            <ProtectedRoute>
+              <ProjectResults />
+            </ProtectedRoute>
+          } />
           <Route path="/404" element={<NotFound />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>
         <Toaster />
