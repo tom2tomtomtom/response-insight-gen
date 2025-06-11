@@ -114,25 +114,46 @@ class ApiClient {
 
   // File Upload
   async uploadFile(projectId: string, file: File) {
+    // Ensure we have a valid token
+    if (!this.token) {
+      this.token = localStorage.getItem('qualicoding-auth-token');
+    }
+    
+    if (!this.token) {
+      return {
+        success: false,
+        error: 'Authentication required - please login again'
+      };
+    }
+
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const headers: HeadersInit = {};
-      if (this.token) {
-        headers['Authorization'] = `Bearer ${this.token}`;
-      }
-
       const response = await fetch(`${this.baseURL}/upload/${projectId}`, {
         method: 'POST',
-        headers,
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
         body: formData,
+        credentials: 'include'
       });
+
+      if (response.status === 401) {
+        this.logout();
+        return {
+          success: false,
+          error: 'Session expired - please login again'
+        };
+      }
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || `HTTP ${response.status}`);
+        return {
+          success: false,
+          error: result.error || `Upload failed: ${response.status}`
+        };
       }
 
       return result;
@@ -140,7 +161,7 @@ class ApiClient {
       console.error('File upload failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Upload failed'
+        error: error instanceof Error ? error.message : 'Network error - please try again'
       };
     }
   }
