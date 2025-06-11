@@ -19,13 +19,23 @@ const CleanLayout: React.FC<CleanLayoutProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem('qualicoding-auth');
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out.",
-    });
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      const { apiClient } = await import('../services/apiClient');
+      apiClient.logout();
+      localStorage.removeItem('qualicoding-auth');
+      
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still proceed with logout even if API call fails
+      localStorage.removeItem('qualicoding-auth');
+      navigate('/login');
+    }
   };
 
   return (

@@ -20,25 +20,26 @@ const Login: React.FC = () => {
     setIsLoading(true);
     setError('');
 
-    // Simulate authentication delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const { apiClient } = await import('../services/apiClient');
+      const result = await apiClient.login(credentials.username, credentials.password);
 
-    // Simple credential check (in production, this would be server-side)
-    const validUsername = 'insights';
-    const validPassword = 'codify2025';
-
-    if (credentials.username === validUsername && credentials.password === validPassword) {
-      // Store authentication state
-      localStorage.setItem('qualicoding-auth', 'authenticated');
-      
-      toast({
-        title: "Welcome back!",
-        description: "Successfully logged in to Qualitative Coding.",
-      });
-      
-      navigate('/dashboard');
-    } else {
-      setError('Invalid username or password');
+      if (result.success) {
+        // Store authentication state (token is stored by apiClient)
+        localStorage.setItem('qualicoding-auth', 'authenticated');
+        
+        toast({
+          title: "Welcome back!",
+          description: "Successfully logged in to Qualitative Coding.",
+        });
+        
+        navigate('/dashboard');
+      } else {
+        setError(result.error || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Unable to connect to server. Please try again.');
     }
     
     setIsLoading(false);
