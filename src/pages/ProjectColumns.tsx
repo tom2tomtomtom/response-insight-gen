@@ -41,16 +41,32 @@ const ProjectColumns: React.FC = () => {
           
           // Auto-select text columns with meaningful content
           const textColumns = (columns || [])
-            .filter((col: ColumnInfo) => 
-              col.type === 'text' && 
-              col.nonEmptyCount > 0 &&
-              // Filter out likely non-text columns
-              !col.name.toLowerCase().includes('id') &&
-              !col.name.toLowerCase().includes('respondent') &&
-              !col.name.toLowerCase().includes('timestamp') &&
-              !col.name.toLowerCase().includes('date')
-            )
+            .filter((col: ColumnInfo) => {
+              const columnName = col.name.toLowerCase();
+              const isTextType = col.type === 'text';
+              const hasContent = col.nonEmptyCount > 0;
+              
+              // Filter out likely non-text columns (IDs, metadata, etc.)
+              const isMetadataColumn = 
+                columnName.includes('id') ||
+                columnName.includes('respondent') ||
+                columnName.includes('timestamp') ||
+                columnName.includes('date') ||
+                columnName.includes('time') ||
+                columnName.includes('created') ||
+                columnName.includes('modified') ||
+                columnName.includes('status') ||
+                columnName.includes('uuid') ||
+                columnName.includes('ref') ||
+                columnName.startsWith('q') && columnName.length <= 3; // Skip Q1, Q2, etc. unless they have descriptive text
+              
+              console.log(`Column "${col.name}": type=${col.type}, nonEmpty=${col.nonEmptyCount}, isMetadata=${isMetadataColumn}`);
+              
+              return isTextType && hasContent && !isMetadataColumn;
+            })
             .map((col: ColumnInfo) => col.index);
+          
+          console.log('Auto-selected text columns:', textColumns);
           setSelectedColumns(textColumns);
 
           // Try to auto-detect respondent ID column
