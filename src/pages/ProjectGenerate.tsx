@@ -165,92 +165,33 @@ const ProjectGenerate: React.FC = () => {
   };
 
   const generateCodeframeForGroup = async (group: QuestionGroup): Promise<CodeframeEntry[]> => {
-    if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
+    if (!projectId) {
+      throw new Error('Project ID not found');
     }
 
-    // Get raw data
-    const fileData = localStorage.getItem(`qualicoding-project-${projectId}-file`);
-    if (!fileData) {
-      throw new Error('File data not found');
-    }
-
-    const parsedFile = JSON.parse(fileData);
-    const rawData = parsedFile.rawData;
-
-    // Extract responses for this group's columns
-    const responses: string[] = [];
-    
-    // Skip header row (index 0)
-    for (let rowIndex = 1; rowIndex < rawData.length; rowIndex++) {
-      const row = rawData[rowIndex];
+    try {
+      const { default: apiClient } = await import('../services/apiClient');
       
-      // Concatenate responses from all columns in this group
-      const groupResponses = group.columns
-        .map(colIndex => row[colIndex])
-        .filter(val => val && String(val).trim())
-        .map(val => String(val).trim());
-      
-      if (groupResponses.length > 0) {
-        responses.push(groupResponses.join(' ∥ '));
+      const result = await apiClient.generateCodeframe(projectId, {
+        groupId: group.id,
+        groupName: group.name,
+        questionType: group.questionType,
+        columns: group.columns,
+        samplePercentage: 30
+      });
+
+      if (result.success && result.data) {
+        return result.data.codeframe || [];
+      } else {
+        throw new Error(result.error || 'Codeframe generation failed');
       }
+    } catch (error) {
+      console.error('Codeframe generation error:', error);
+      throw error;
     }
-
-    if (responses.length === 0) {
-      throw new Error('No responses found for this group');
-    }
-
-    // Sample 30% of responses
-    const sampledResponses = sampleResponses(responses, 30);
-    
-    // Get prompt configuration for question type
-    const promptConfig = QUESTION_TYPE_PROMPTS[group.questionType];
-    
-    // Call OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: promptConfig.systemPrompt
-          },
-          {
-            role: 'user', 
-            content: promptConfig.userPrompt(sampledResponses, sampledResponses.length)
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 3000,
-        response_format: { type: "json_object" }
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    const result = JSON.parse(data.choices[0].message.content);
-    
-    return result.codeframe || [];
   };
 
   const handleGenerateAll = async () => {
-    if (!apiKey) {
-      toast({
-        variant: "destructive",
-        title: "API Key Required",
-        description: "Please configure your OpenAI API key to generate codeframes.",
-      });
-      return;
-    }
 
     setIsGenerating(true);
     
@@ -370,7 +311,7 @@ const ProjectGenerate: React.FC = () => {
         </div>
 
         <div className="space-y-6">
-          {/* API Configuration */}
+          {/* AI Configuration */}
           <Card>
             <CardHeader>
               <CardTitle>AI Configuration</CardTitle>
@@ -378,14 +319,14 @@ const ProjectGenerate: React.FC = () => {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">OpenAI API Key</p>
+                  <p className="font-medium">OpenAI API</p>
                   <p className="text-sm text-slate-600">
-                    {apiKey ? 'API key configured' : 'No API key configured'}
+                    API key is configured on the server for secure processing
                   </p>
                 </div>
-                <Button variant="outline" onClick={handleSetApiKey}>
-                  {apiKey ? 'Update Key' : 'Set API Key'}
-                </Button>
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  Server Configured
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -397,7 +338,7 @@ const ProjectGenerate: React.FC = () => {
                 <CardTitle>Codeframe Generation</CardTitle>
                 <Button 
                   onClick={handleGenerateAll}
-                  disabled={!apiKey || isGenerating}
+                  disabled={isGenerating}
                 >
                   {isGenerating ? (
                     <>

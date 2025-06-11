@@ -26,29 +26,43 @@ const ProjectColumns: React.FC = () => {
   const [respondentIdColumn, setRespondentIdColumn] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!projectId) return;
+    const loadFileData = async () => {
+      if (!projectId) return;
 
-    // Load file data
-    const fileData = localStorage.getItem(`qualicoding-project-${projectId}-file`);
-    if (fileData) {
-      const parsed = JSON.parse(fileData);
-      setColumns(parsed.columns || []);
-      
-      // Auto-select text columns
-      const textColumns = (parsed.columns || [])
-        .filter((col: ColumnInfo) => col.type === 'text')
-        .map((col: ColumnInfo) => col.index);
-      setSelectedColumns(textColumns);
+      try {
+        const { default: apiClient } = await import('../services/apiClient');
+        const result = await apiClient.getFileMetadata(projectId);
+        
+        if (result.success && result.data) {
+          const { columns } = result.data;
+          setColumns(columns || []);
+          
+          // Auto-select text columns
+          const textColumns = (columns || [])
+            .filter((col: ColumnInfo) => col.type === 'text')
+            .map((col: ColumnInfo) => col.index);
+          setSelectedColumns(textColumns);
 
-      // Try to auto-detect respondent ID column
-      const idColumn = (parsed.columns || []).find((col: ColumnInfo) => 
-        col.name.toLowerCase().includes('id') || 
-        col.name.toLowerCase().includes('respondent')
-      );
-      if (idColumn) {
-        setRespondentIdColumn(idColumn.index);
+          // Try to auto-detect respondent ID column
+          const idColumn = (columns || []).find((col: ColumnInfo) => 
+            col.name.toLowerCase().includes('id') || 
+            col.name.toLowerCase().includes('respondent')
+          );
+          if (idColumn) {
+            setRespondentIdColumn(idColumn.index);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading file data:', error);
+        toast({
+          variant: "destructive",
+          title: "Error loading file data",
+          description: "Please try uploading the file again.",
+        });
       }
-    }
+    };
+
+    loadFileData();
   }, [projectId]);
 
   const handleColumnToggle = (columnIndex: number) => {

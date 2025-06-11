@@ -104,78 +104,38 @@ const ProjectUpload: React.FC = () => {
     setUploadProgress(0);
 
     try {
-      // Simulate progress
-      for (let i = 0; i <= 100; i += 10) {
-        setUploadProgress(i);
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // Use backend API for file upload and processing
+      const { default: apiClient } = await import('../services/apiClient');
+      
+      // Simulate progress updates during upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          let data: any[][];
-          
-          if (file.name.endsWith('.csv')) {
-            const text = e.target?.result as string;
-            data = text.split('\n').map(row => row.split(','));
-          } else {
-            const workbook = XLSX.read(e.target?.result, { type: 'binary' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-          }
+      const result = await apiClient.uploadFile(projectId, file);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
-          const analyzedColumns = analyzeColumns(data);
-          setColumns(analyzedColumns);
-
-          // Save file info to project (optimize storage by limiting raw data)
-          const fileInfo = {
-            filename: file.name,
-            uploadedAt: new Date(),
-            columns: analyzedColumns,
-            totalRows: data.length - 1, // Exclude header
-            rawData: data.slice(0, Math.min(1000, data.length)) // Limit to first 1000 rows for localStorage
-          };
-
-          try {
-            localStorage.setItem(`qualicoding-project-${projectId}-file`, JSON.stringify(fileInfo));
-            setIsProcessed(true);
-            toast({
-              title: "File processed successfully",
-              description: `Found ${analyzedColumns.filter(col => col.type === 'text').length} text columns ready for analysis.`,
-            });
-          } catch (storageError) {
-            // Handle localStorage quota exceeded
-            if (storageError instanceof DOMException && storageError.code === 22) {
-              toast({
-                variant: "destructive",
-                title: "File too large for browser storage",
-                description: "Please try a smaller file or contact support for backend storage options.",
-              });
-            } else {
-              throw storageError;
-            }
-          }
-        } catch (error) {
-          console.error('Error processing file:', error);
-          toast({
-            variant: "destructive",
-            title: "Processing failed",
-            description: "There was an error processing your file. Please check the format and try again.",
-          });
-        }
-      };
-
-      if (file.name.endsWith('.csv')) {
-        reader.readAsText(file);
+      if (result.success && result.data) {
+        const { columns, totalRows, size } = result.data;
+        setColumns(columns);
+        
+        setIsProcessed(true);
+        toast({
+          title: "File processed successfully",
+          description: `Found ${columns.filter((col: any) => col.type === 'text').length} text columns ready for analysis. ${totalRows.toLocaleString()} rows processed.`,
+        });
       } else {
-        reader.readAsBinaryString(file);
+        throw new Error(result.error || 'Upload failed');
       }
+
     } catch (error) {
       console.error('Upload error:', error);
       toast({
         variant: "destructive",
         title: "Upload failed",
-        description: "There was an error uploading your file.",
+        description: error instanceof Error ? error.message : "There was an error uploading your file.",
       });
     } finally {
       setIsUploading(false);
