@@ -6,7 +6,8 @@ import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
 import { Badge } from '../components/ui/badge';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { ArrowLeft, ArrowRight, FileText, CheckCircle, Users } from 'lucide-react';
+import { Input } from '../components/ui/input';
+import { ArrowLeft, ArrowRight, FileText, CheckCircle, Users, Search } from 'lucide-react';
 import { toast } from '../components/ui/use-toast';
 
 interface ColumnInfo {
@@ -24,6 +25,7 @@ const ProjectColumns: React.FC = () => {
   const [columns, setColumns] = useState<ColumnInfo[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<number[]>([]);
   const [respondentIdColumn, setRespondentIdColumn] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     const loadFileData = async () => {
@@ -37,16 +39,26 @@ const ProjectColumns: React.FC = () => {
           const { columns } = result.data;
           setColumns(columns || []);
           
-          // Auto-select text columns
+          // Auto-select text columns with meaningful content
           const textColumns = (columns || [])
-            .filter((col: ColumnInfo) => col.type === 'text')
+            .filter((col: ColumnInfo) => 
+              col.type === 'text' && 
+              col.nonEmptyCount > 0 &&
+              // Filter out likely non-text columns
+              !col.name.toLowerCase().includes('id') &&
+              !col.name.toLowerCase().includes('respondent') &&
+              !col.name.toLowerCase().includes('timestamp') &&
+              !col.name.toLowerCase().includes('date')
+            )
             .map((col: ColumnInfo) => col.index);
           setSelectedColumns(textColumns);
 
           // Try to auto-detect respondent ID column
           const idColumn = (columns || []).find((col: ColumnInfo) => 
             col.name.toLowerCase().includes('id') || 
-            col.name.toLowerCase().includes('respondent')
+            col.name.toLowerCase().includes('respondent') ||
+            col.name.toLowerCase().includes('response_id') ||
+            col.name.toLowerCase().includes('participant')
           );
           if (idColumn) {
             setRespondentIdColumn(idColumn.index);
@@ -120,8 +132,16 @@ const ProjectColumns: React.FC = () => {
     navigate(`/project/${projectId}/grouping`);
   };
 
-  const textColumns = columns.filter(col => col.type === 'text');
-  const nonTextColumns = columns.filter(col => col.type !== 'text');
+  // Filter columns based on search term
+  const filteredColumns = columns.filter(col => 
+    col.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    col.examples.some(example => 
+      example.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
+  const textColumns = filteredColumns.filter(col => col.type === 'text');
+  const nonTextColumns = filteredColumns.filter(col => col.type !== 'text');
 
   return (
     <CleanLayout title="Select Columns" subtitle="Step 3 of 4: Column Selection">
@@ -146,8 +166,17 @@ const ProjectColumns: React.FC = () => {
               <p className="text-slate-600 mb-4">
                 Select the column that contains unique respondent identifiers.
               </p>
+              {/* Search for respondent ID columns */}
+              <div className="mb-4">
+                <Input
+                  placeholder="Search columns..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {columns.map((column) => (
+                {filteredColumns.map((column) => (
                   <div key={`id-${column.index}`} className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50">
                     <Checkbox
                       id={`respondent-${column.index}`}
@@ -193,8 +222,21 @@ const ProjectColumns: React.FC = () => {
             </CardHeader>
             <CardContent>
               <p className="text-slate-600 mb-4">
-                Select the text columns you want to analyze. Only text columns can be processed for coding.
+                Select the text columns you want to analyze. Text columns with meaningful content are automatically selected.
               </p>
+              
+              {/* Search for text columns */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search columns by name or content..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
               
               {textColumns.length === 0 ? (
                 <Alert>
@@ -203,8 +245,14 @@ const ProjectColumns: React.FC = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <div className="grid grid-cols-1 gap-3">
-                  {textColumns.map((column) => (
+                <>
+                  {searchTerm && (
+                    <div className="mb-3 text-sm text-slate-600">
+                      Showing {textColumns.length} of {columns.filter(col => col.type === 'text').length} text columns
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 gap-3">
+                    {textColumns.map((column) => (
                     <div key={column.index} className={`p-4 border rounded-lg transition-colors ${
                       selectedColumns.includes(column.index) 
                         ? 'border-blue-300 bg-blue-50' 
@@ -238,8 +286,9 @@ const ProjectColumns: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
