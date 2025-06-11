@@ -1,5 +1,5 @@
 // API Client for Backend Communication
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://qualicoding-backend.onrender.com/api';
 
 class ApiClient {
   private baseURL: string;

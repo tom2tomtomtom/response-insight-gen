@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: qualicoding-backend
+    env: node
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AUTH_USERNAME
+        value: insights
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MAX_FILE_SIZE
+        value: 500000000
+      - key: CORS_ORIGIN
+        value: "*"
