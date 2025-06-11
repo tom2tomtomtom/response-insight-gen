@@ -16,9 +16,12 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet());
+// CORS configuration - allow all origins for production
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
-  credentials: true
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Rate limiting
