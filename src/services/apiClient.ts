@@ -34,6 +34,7 @@ class ApiClient {
           ...this.getHeaders(),
           ...options.headers,
         },
+        credentials: 'include'
       };
 
       const response = await fetch(url, config);
